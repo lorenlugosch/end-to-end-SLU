@@ -316,16 +316,13 @@ class PretrainedModel(torch.nn.Module):
 			y_word = y_word.cuda()
 
 		out = x.unsqueeze(1)
-		# print(out.shape)
-		# print(y_phoneme.shape)
-		# print(y_word.shape)
 		for layer in self.phoneme_layers:
 			out = layer(out)
-			# try:
-			# 	print(layer.name + ": " + str(out.shape))
-			# except:
-			# 	print(layer.name + ": (no shape)")
 		phoneme_logits = self.phoneme_linear(out)
+		print(phoneme_logits[0])
+		print(y_phoneme[0])
+		phoneme_logits = phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1)
+		y_phoneme = y_phoneme.view(-1)
 		# print("phoneme_logits: " + str(phoneme_logits.shape))
 
 		for layer in self.word_layers:
@@ -335,12 +332,21 @@ class PretrainedModel(torch.nn.Module):
 			# except:
 			# 	print(layer.name + ": (no shape)")
 		word_logits = self.word_linear(out)
+		print(word_logits[0])
+		print(y_word[0])
+		word_logits = word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1)
+		y_word = y_word.view(-1)
 		# print("word_logits: " + str(word_logits.shape))
 
-		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1), y_phoneme.view(-1), ignore_index=-1)
-		word_loss = torch.nn.functional.cross_entropy(word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1), y_word.view(-1), ignore_index=-1)
+		# phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1), y_phoneme.view(-1), ignore_index=-1)
+		# word_loss = torch.nn.functional.cross_entropy(word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1), y_word.view(-1), ignore_index=-1)
+		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits, y_phoneme, ignore_index=-1)
+		word_loss = torch.nn.functional.cross_entropy(word_logits, y_word, ignore_index=-1)
 
-		return phoneme_loss, word_loss
+		phoneme_acc = (phoneme_logits.max(1)[1] == y_phoneme).float().mean()
+		word_acc = (word_logits.max(1)[1] == y_word).float().mean()
+
+		return phoneme_loss, word_loss, phoneme_acc, word_acc
 
 	def compute_features(self, x):
 		return 1
