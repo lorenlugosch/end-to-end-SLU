@@ -316,6 +316,9 @@ class PretrainedModel(torch.nn.Module):
 			y_word = y_word.cuda()
 
 		out = x.unsqueeze(1)
+		print(out.shape)
+		print(y_phoneme.shape)
+		print(y_word.shape)
 		for layer in self.phoneme_layers:
 			out = layer(out)
 			try:
