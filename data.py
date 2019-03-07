@@ -95,6 +95,7 @@ def get_datasets(base_path, config):
 	Sy_phoneme = list(phoneme_counter)
 	Sy_word = [w[0] for w in word_counter.most_common(config.vocabulary_size)]
 	config.num_phonemes = len(Sy_phoneme)
+	print("Done.")
 
 	# Create dataset objects
 	train_dataset = SpeechCommandDataset(train_wav_paths, train_textgrid_paths, Sy_phoneme, Sy_word, config)
