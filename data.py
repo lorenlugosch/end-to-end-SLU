@@ -143,14 +143,14 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		y_phoneme = []
 		for phoneme in tg.getList("phones")[0]:
 			duration = phoneme.maxTime - phoneme.minTime
-			phoneme_index = Sy_phoneme.index(phoneme.mark.rstrip("0123456789")) if phoneme.mark.rstrip("0123456789") in Sy_phoneme else -1
+			phoneme_index = self.Sy_phoneme.index(phoneme.mark.rstrip("0123456789")) if phoneme.mark.rstrip("0123456789") in self.Sy_phoneme else -1
 			if phoneme.mark == '': phoneme_index = -1
 			y_phoneme += [phoneme_index] * round(duration * fs)
 
 		y_word = []
 		for word in tg.getList("words")[0]:
 			duration = word.maxTime - word.minTime
-			word_index = Sy_word.index(word.mark) if word.mark in Sy_word else -1
+			word_index = self.Sy_word.index(word.mark) if word.mark in self.Sy_word else -1
 			if word.mark == '': word_index = -1
 			y_word += [word_index] * round(duration * fs)
 
@@ -180,8 +180,9 @@ def one_hot(labels, S):
 	return out
 
 class CollateWavs:
-	# def __init__(self, Sy):
-	# 	self.Sy = Sy
+	# def __init__(self, Sy_phoneme, Sy_word):
+	# 	self.Sy_phoneme = Sy_phoneme
+	# 	self.Sy_word = Sy_word
 
 	def __call__(self, batch):
 		"""
