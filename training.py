@@ -26,8 +26,6 @@ class Trainer:
 			batch_size = len(x)
 			num_examples += batch_size
 			phoneme_loss, word_loss = self.model(x,y_phoneme,y_word)
-			print("phoneme loss: " + str(phoneme_loss.cpu().data.numpy().item()))
-			print("word loss: " + str(word_loss.cpu().data.numpy().item()))
 			loss = phoneme_loss + word_loss
 			# acc = (y * y_hat.cpu()).sum(1).mean()
 			self.optimizer.zero_grad()
@@ -35,8 +33,9 @@ class Trainer:
 			self.optimizer.step()
 			train_loss += loss.cpu().data.numpy().item() * batch_size
 			# train_acc += acc * batch_size
-			# if idx % print_interval == 0:
-			# 	print("loss: %.2f | acc: %.2f" % (train_loss/num_examples,train_acc/num_examples))
+			if idx % print_interval == 0:
+				print("phoneme loss: " + str(phoneme_loss.cpu().data.numpy().item()))
+				print("word loss: " + str(word_loss.cpu().data.numpy().item()))
 		train_loss /= num_examples
 		train_acc /= num_examples
 		train_acc = train_acc
