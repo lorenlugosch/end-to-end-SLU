@@ -157,7 +157,10 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 			if word.mark == '': word_index = -1
 			y_word += [word_index] * round(duration * fs)
 
-		start = 0 if len(x) < self.max_length else start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
+		if len(x) < self.max_length:
+			start = 0
+		else:
+			start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
 		end = start + self.max_length
 
 		x = x[start:end]
