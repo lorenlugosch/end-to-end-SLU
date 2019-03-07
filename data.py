@@ -83,9 +83,6 @@ def get_datasets(base_path, config):
 	test_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in test_textgrid_paths]
 	
 	# Get list of phonemes and words
-	print(len(train_wav_paths))
-	print(len(valid_wav_paths))
-	print(len(test_wav_paths))
 	print("Getting vocabulary...")
 	phoneme_counter = Counter()
 	word_counter = Counter()
