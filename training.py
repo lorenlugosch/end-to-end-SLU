@@ -52,7 +52,7 @@ class Trainer:
 			x,y_phoneme,y_word = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			phoneme_loss, word_loss = self.model(x,y_phoneme,y_word)
+			phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
 			loss = phoneme_loss + word_loss
 			# acc = (y * y_hat.cpu()).sum(1).mean()
 			test_loss += loss.cpu().data.numpy().item() * batch_size
