@@ -6,6 +6,7 @@ import soundfile as sf
 import python_speech_features
 import numpy as np
 import configparser
+import textgrid
 
 class Config:
 	def __init__(self):
