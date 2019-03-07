@@ -56,9 +56,13 @@ def read_config(config_file):
 	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
 
 	# compute downsample factor (divide T by this number)
-	config.downsample_factor = 1
+	config.phone_downsample_factor = 1
+	for factor in config.cnn_stride + config.cnn_max_pool_len + config.phone_downsample_len:
+		config.phone_downsample_factor *= factor
+
+	config.word_downsample_factor = 1
 	for factor in config.cnn_stride + config.cnn_max_pool_len + config.phone_downsample_len + config.word_downsample_len:
-		config.downsample_factor *= factor
+		config.word_downsample_factor *= factor
 
 	return config
 
@@ -118,7 +122,8 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		self.max_length = 80000 # truncate audios longer than this
 		self.Sy_phoneme = Sy_phoneme
 		self.Sy_word = Sy_word
-		self.downsample_factor = config.downsample_factor
+		self.phone_downsample_factor = config.phone_downsample_factor
+		self.word_downsample_factor = config.word_downsample_factor
 		
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=4, shuffle=True, collate_fn=CollateWavs())
 
@@ -161,8 +166,8 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		end = start + self.max_length
 
 		x = x[start:end]
-		y_phoneme = y_phoneme[start:end:self.downsample_factor]
-		y_word = y_word[start:end:self.downsample_factor]
+		y_phoneme = y_phoneme[start:end:self.phone_downsample_factor]
+		y_word = y_word[start:end:self.word_downsample_factor]
 
 		return (x, y_phoneme, y_word)
 
