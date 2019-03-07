@@ -166,7 +166,8 @@ class PretrainedModel(torch.nn.Module):
 	"""
 	def __init__(self, config):
 		super(PretrainedModel, self).__init__()
-		self.layers = []
+		self.phoneme_layers = []
+		self.word_layers = []
 
 		# CNN
 		num_conv_layers = len(config.cnn_N_filt)
@@ -186,21 +187,21 @@ class PretrainedModel(torch.nn.Module):
 				if config.use_sincnet:
 					layer = SincLayer(config.cnn_N_filt[idx], config.cnn_len_filt[idx], config.fs, stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2)
 					layer.name = "sinc%d" % idx
-					self.layers.append(layer)
+					self.phoneme_layers.append(layer)
 				else:
 					layer = torch.nn.Conv1d(1, config.cnn_N_filt[idx], config.cnn_len_filt[idx], stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2)
 					layer.name = "conv%d" % idx
-					self.layers.append(layer)
+					self.phoneme_layers.append(layer)
 
 				layer = Abs()
 				layer.name = "abs%d" % idx
-				self.layers.append(layer)
+				self.phoneme_layers.append(layer)
 
 			# subsequent conv layers
 			else:
 				layer = torch.nn.Conv1d(config.cnn_N_filt[idx-1], config.cnn_N_filt[idx], config.cnn_len_filt[idx], stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2)
 				layer.name = "conv%d" % idx
-				self.layers.append(layer)
+				self.phoneme_layers.append(layer)
 
 			# # batch norm
 			# if config.cnn_use_batchnorm[idx]: 
@@ -217,7 +218,7 @@ class PretrainedModel(torch.nn.Module):
 			# pool
 			layer = torch.nn.MaxPool1d(config.cnn_max_pool_len[idx])
 			layer.name = "pool%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 			# activation
 			if config.cnn_act[idx] == "leaky_relu":
@@ -225,17 +226,17 @@ class PretrainedModel(torch.nn.Module):
 			else: 
 				layer = torch.nn.ReLU()
 			layer.name = "act%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 			# dropout
 			layer = torch.nn.Dropout(p=config.cnn_drop[idx])
 			layer.name = "dropout%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 		# reshape output of CNN to be suitable for RNN (batch size, T, Cin)
 		layer = NCL2NLC()
 		layer.name = "ncl2nlc"
-		self.layers.append(layer)
+		self.phoneme_layers.append(layer)
 
 		# phoneme RNN
 		num_rnn_layers = len(config.phone_rnn_lay)
@@ -245,7 +246,7 @@ class PretrainedModel(torch.nn.Module):
 			if config.phone_rnn_type == "gru":
 				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.phone_rnn_lay[idx], batch_first=True, bidirectional=config.phone_rnn_bidirectional)
 			layer.name = "phone_rnn%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 		
 			out_dim = config.phone_rnn_lay[idx]
 			if config.phone_rnn_bidirectional:
@@ -254,17 +255,17 @@ class PretrainedModel(torch.nn.Module):
 			# grab hidden states of RNN for each timestep
 			layer = RNNSelect()
 			layer.name = "phone_rnn_select%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 			# dropout
 			layer = torch.nn.Dropout(p=config.phone_rnn_drop[idx])
 			layer.name = "phone_dropout%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 			# downsample
 			layer = Downsample(method=config.phone_downsample_type[idx], factor=config.phone_downsample_len[idx], axis=1)
 			layer.name = "phone_downsample%d" % idx
-			self.layers.append(layer)
+			self.phoneme_layers.append(layer)
 
 		self.phoneme_layers = torch.nn.ModuleList(self.phoneme_layers)
 		self.phoneme_linear = torch.nn.Linear(out_dim, config.num_phonemes)
@@ -276,7 +277,7 @@ class PretrainedModel(torch.nn.Module):
 			if config.word_rnn_type == "gru":
 				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.word_rnn_lay[idx], batch_first=True, bidirectional=config.word_rnn_bidirectional)
 			layer.name = "word_rnn%d" % idx
-			self.layers.append(layer)
+			self.word_layers.append(layer)
 		
 			out_dim = config.word_rnn_lay[idx]
 			if config.word_rnn_bidirectional:
@@ -285,17 +286,17 @@ class PretrainedModel(torch.nn.Module):
 			# grab hidden states of RNN for each timestep
 			layer = RNNSelect()
 			layer.name = "word_rnn_select%d" % idx
-			self.layers.append(layer)
+			self.word_layers.append(layer)
 
 			# dropout
 			layer = torch.nn.Dropout(p=config.word_rnn_drop[idx])
 			layer.name = "word_dropout%d" % idx
-			self.layers.append(layer)
+			self.word_layers.append(layer)
 
 			# downsample
 			layer = Downsample(method=config.word_downsample_type[idx], factor=config.word_downsample_len[idx], axis=1)
 			layer.name = "word_downsample%d" % idx
-			self.layers.append(layer)
+			self.word_layers.append(layer)
 
 		self.word_layers = torch.nn.ModuleList(self.word_layers)
 		self.word_linear = torch.nn.Linear(out_dim, config.vocabulary_size)
