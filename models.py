@@ -40,9 +40,9 @@ class Downsample(torch.nn.Module):
 		if self.method == "none":
 			return x.transpose(self.axis, 0)[::self.factor].transpose(self.axis, 0)
 		if self.method == "avg":
-			return torch.nn.functional.avg_pool1d(x.transpose(self.axis, 2), kernel_size=self.factor).transpose(self.axis, 2)
+			return torch.nn.functional.avg_pool1d(x.transpose(self.axis, 2), kernel_size=self.factor, ceil_mode=True).transpose(self.axis, 2)
 		if self.method == "max":
-			return torch.nn.functional.max_pool1d(x.transpose(self.axis, 2), kernel_size=self.factor).transpose(self.axis, 2)
+			return torch.nn.functional.max_pool1d(x.transpose(self.axis, 2), kernel_size=self.factor, ceil_mode=True).transpose(self.axis, 2)
 			
 
 class SincLayer(torch.nn.Module):
@@ -305,8 +305,8 @@ class PretrainedModel(torch.nn.Module):
 	def forward(self, x, y_phoneme, y_word):
 		"""
 		x : Tensor of shape (batch size, T), T = 16000
-		y_phoneme : LongTensor of shape (batch size, T_subsampled)
-		y_word : LongTensor of shape (batch size, T_subsampled)
+		y_phoneme : LongTensor of shape (batch size, T')
+		y_word : LongTensor of shape (batch size, T'')
 
 		Compute loss for y_word and y_phoneme for each x in the batch.
 		"""
@@ -316,26 +316,26 @@ class PretrainedModel(torch.nn.Module):
 			y_word = y_word.cuda()
 
 		out = x.unsqueeze(1)
-		print(out.shape)
-		print(y_phoneme.shape)
-		print(y_word.shape)
+		# print(out.shape)
+		# print(y_phoneme.shape)
+		# print(y_word.shape)
 		for layer in self.phoneme_layers:
 			out = layer(out)
-			try:
-				print(layer.name + ": " + str(out.shape))
-			except:
-				print(layer.name + ": (no shape)")
+			# try:
+			# 	print(layer.name + ": " + str(out.shape))
+			# except:
+			# 	print(layer.name + ": (no shape)")
 		phoneme_logits = self.phoneme_linear(out)
-		print("phoneme_logits: " + str(phoneme_logits.shape))
+		# print("phoneme_logits: " + str(phoneme_logits.shape))
 
 		for layer in self.word_layers:
 			out = layer(out)
-			try:
-				print(layer.name + ": " + str(out.shape))
-			except:
-				print(layer.name + ": (no shape)")
+			# try:
+			# 	print(layer.name + ": " + str(out.shape))
+			# except:
+			# 	print(layer.name + ": (no shape)")
 		word_logits = self.word_linear(out)
-		print("word_logits: " + str(word_logits.shape))
+		# print("word_logits: " + str(word_logits.shape))
 
 		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1), y_phoneme.view(-1), ignore_index=-1)
 		word_loss = torch.nn.functional.cross_entropy(word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1), y_word.view(-1), ignore_index=-1)
