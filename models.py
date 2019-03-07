@@ -267,7 +267,7 @@ class PretrainedModel(torch.nn.Module):
 			self.layers.append(layer)
 
 		self.phoneme_layers = torch.nn.ModuleList(self.phoneme_layers)
-		self.word_linear = torch.nn.Linear(out_dim, config.num_phonemes)
+		self.phoneme_linear = torch.nn.Linear(out_dim, config.num_phonemes)
 
 		# word RNN
 		num_rnn_layers = len(config.word_rnn_lay)
