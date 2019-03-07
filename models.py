@@ -216,7 +216,7 @@ class PretrainedModel(torch.nn.Module):
 			# 	self.layers.append(layer)
 
 			# pool
-			layer = torch.nn.MaxPool1d(config.cnn_max_pool_len[idx])
+			layer = torch.nn.MaxPool1d(config.cnn_max_pool_len[idx], ceil_mode=True)
 			layer.name = "pool%d" % idx
 			self.phoneme_layers.append(layer)
 

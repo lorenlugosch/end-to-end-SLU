@@ -125,7 +125,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		self.phone_downsample_factor = config.phone_downsample_factor
 		self.word_downsample_factor = config.word_downsample_factor
 		
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=4, shuffle=True, collate_fn=CollateWavs())
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=16, shuffle=True, collate_fn=CollateWavs())
 
 	def __len__(self):
 		return len(self.wav_paths)
