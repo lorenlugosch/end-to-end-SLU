@@ -36,7 +36,6 @@ class Trainer:
 			if idx % print_interval == 0:
 				print("phoneme loss: " + str(phoneme_loss.cpu().data.numpy().item()))
 				print("word loss: " + str(word_loss.cpu().data.numpy().item()))
-			if idx == print_interval+1: break
 		train_loss /= num_examples
 		train_acc /= num_examples
 		train_acc = train_acc
@@ -48,7 +47,6 @@ class Trainer:
 		num_examples = 0
 		self.model.eval()
 		for idx, batch in enumerate(dataset.loader):
-			print(idx)
 			x,y_phoneme,y_word = batch
 			batch_size = len(x)
 			num_examples += batch_size
