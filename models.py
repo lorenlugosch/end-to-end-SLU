@@ -319,18 +319,20 @@ class PretrainedModel(torch.nn.Module):
 		for layer in self.phoneme_layers:
 			out = layer(out)
 			try:
-				print(layer.name + ": " + out.shape)
+				print(layer.name + ": " + str(out.shape))
 			except:
 				print(layer.name + ": (no shape)")
 		phoneme_logits = self.phoneme_linear(out)
+		print("phoneme_logits: " + str(phoneme_logits.shape))
 
 		for layer in self.word_layers:
 			out = layer(out)
 			try:
-				print(layer.name + ": " + out.shape)
+				print(layer.name + ": " + str(out.shape))
 			except:
 				print(layer.name + ": (no shape)")
 		word_logits = self.word_linear(out)
+		print("word_logits: " + str(word_logits.shape))
 
 		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1), y_phoneme.view(-1), ignore_index=-1)
 		word_loss = torch.nn.functional.cross_entropy(word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1), y_word.view(-1), ignore_index=-1)
