@@ -74,11 +74,11 @@ def get_datasets(base_path, config):
 	"""
 
 	# Get only files with a label
-	train_textgrid_paths = glob.glob(path_to_librispeech + "/aligned/train*/*/*/*.TextGrid")
+	train_textgrid_paths = glob.glob(base_path + "/aligned/train*/*/*/*.TextGrid")
 	train_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in train_textgrid_paths]
-	valid_textgrid_paths = glob.glob(path_to_librispeech + "/aligned/dev*/*/*/*.TextGrid")
+	valid_textgrid_paths = glob.glob(base_path + "/aligned/dev*/*/*/*.TextGrid")
 	valid_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in valid_textgrid_paths]
-	test_textgrid_paths = glob.glob(path_to_librispeech + "/aligned/test*/*/*/*.TextGrid")
+	test_textgrid_paths = glob.glob(base_path + "/aligned/test*/*/*/*.TextGrid")
 	test_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in test_textgrid_paths]
 	
 	# Get list of phonemes and words
