@@ -8,8 +8,15 @@ class Trainer:
 		self.lr = config.lr
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 		self.config = config
+		self.epoch = -1
 		
 	def train(self, dataset, print_interval=100):
+		self.epoch += 1
+		if self.epoch < len(self.config.pretraining_length_schedule): 
+			dataset.max_length = self.config.pretraining_length_schedule[self.epoch] * fs
+		else:
+			dataset.max_length = self.config.pretraining_length_schedule[-1] * fs
+
 		train_acc = 0
 		train_loss = 0
 		num_examples = 0

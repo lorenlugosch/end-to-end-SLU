@@ -48,16 +48,11 @@ def read_config(config_file):
 	config.vocabulary_size=int(parser.get("word_module", "vocabulary_size"))
 
 	#[pretraining]
-	pretraining_lr=0.001
-	pretraining_batch_size=64
-	pretraining_num_epochs=20
-	pretraining_seed=1234
-	pretraining_length_schedule=0.5,1.0,2.0,4.0,8.0
-	config.lr=float(parser.get("pretraining", "lr"))
-	config.batch_size=int(parser.get("pretraining", "batch_size"))
-	config.num_epochs=int(parser.get("pretraining", "num_epochs"))
-	config.seed=int(parser.get("pretraining", "seed"))
-	config.pretraining_length_schedule=int(parser.get("pretraining", "seed"))
+	config.lr=float(parser.get("pretraining", "pretraining_lr"))
+	config.batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
+	config.num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
+	config.seed=int(parser.get("pretraining", "pretraining_seed"))
+	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
 
 	# compute downsample factor (divide T by this number)
 	config.downsample_factor = 1
