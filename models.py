@@ -164,7 +164,7 @@ class PretrainedModel(torch.nn.Module):
 	"""
 	Model pre-trained to recognize phonemes and words.
 	"""
-	def __init__(self, config, Sy_size):
+	def __init__(self, config):
 		super(Model, self).__init__()
 		self.layers = []
 
