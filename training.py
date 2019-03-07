@@ -13,9 +13,9 @@ class Trainer:
 	def train(self, dataset, print_interval=100):
 		self.epoch += 1
 		if self.epoch < len(self.config.pretraining_length_schedule): 
-			dataset.max_length = self.config.pretraining_length_schedule[self.epoch] * self.config.fs
+			dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
 		else:
-			dataset.max_length = self.config.pretraining_length_schedule[-1] * self.config.fs
+			dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
 
 		train_acc = 0
 		train_loss = 0
