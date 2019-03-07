@@ -206,13 +206,16 @@ class CollateWavs:
 
 		# pad all sequences to have same length
 		T = max([len(x_) for x_ in x])
-		U = max([len(y_phoneme_) for y_phoneme_ in y_phoneme])
+		U_phoneme = max([len(y_phoneme_) for y_phoneme_ in y_phoneme])
+		U_word = max([len(y_word_) for y_word_ in y_word])
 		for index in range(batch_size):
 			x_pad_length = (T - len(x[index]))
 			x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
 
-			y_pad_length = (U - len(y_phoneme[index]))
+			y_pad_length = (U_phoneme - len(y_phoneme[index]))
 			y_phoneme[index] = torch.nn.functional.pad(y_phoneme[index], (0,y_pad_length))
+			
+			y_pad_length = (U_word - len(y_word[index]))
 			y_word[index] = torch.nn.functional.pad(y_word[index], (0,y_pad_length))
 
 		x = torch.stack(x)
