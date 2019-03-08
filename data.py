@@ -171,19 +171,6 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 
 		return (x, y_phoneme, y_word)
 
-def one_hot(labels, S):
-	"""
-	labels : LongTensor of shape (batch size,)
-	S : integer
-
-	Convert batch of integer labels to one-hot vectors of dimension S (# of possible letters).
-	"""
-
-	out = torch.zeros(labels.shape[0], S)
-	for i in range(0, labels.shape[0]):
-		out[i, labels[i]] = 1
-	return out
-
 class CollateWavs:
 	# def __init__(self, Sy_phoneme, Sy_word):
 	# 	self.Sy_phoneme = Sy_phoneme
