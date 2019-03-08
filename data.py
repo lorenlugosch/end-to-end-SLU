@@ -37,7 +37,7 @@ def read_config(config_file):
 	config.phone_downsample_len=[int(x) for x in parser.get("phoneme_module", "phone_downsample_len").split(",")]
 	config.phone_downsample_type=[x for x in parser.get("phoneme_module", "phone_downsample_type").split(",")]
 	config.phone_rnn_drop=[float(x) for x in parser.get("phoneme_module", "phone_rnn_drop").split(",")]
-	config.phone_rnn_bidirectional=(parser.get("phoneme_module", "phone_rnn_bidirectional") == True)
+	config.phone_rnn_bidirectional=(parser.get("phoneme_module", "phone_rnn_bidirectional") == "True")
 
 	#[word_module]
 	config.word_rnn_type=parser.get("word_module", "word_rnn_type")
@@ -45,7 +45,7 @@ def read_config(config_file):
 	config.word_downsample_len=[int(x) for x in parser.get("word_module", "word_downsample_len").split(",")]
 	config.word_downsample_type=[x for x in parser.get("word_module", "word_downsample_type").split(",")]
 	config.word_rnn_drop=[float(x) for x in parser.get("word_module", "word_rnn_drop").split(",")]
-	config.word_rnn_bidirectional=(parser.get("word_module", "word_rnn_bidirectional") == True)
+	config.word_rnn_bidirectional=(parser.get("word_module", "word_rnn_bidirectional") == "True")
 	config.vocabulary_size=int(parser.get("word_module", "vocabulary_size"))
 
 	#[pretraining]
