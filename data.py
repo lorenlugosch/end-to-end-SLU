@@ -72,19 +72,19 @@ def get_datasets(base_path, config):
 		e.g., "/home/data/librispeech"
 
 		Assumes this directory contains the following two directories:
-			"LibriSpeech" : wav files (split into )
-			"aligned" : alignments for each wav
+			"audio" : wav files (split into train-clean, train-other, ...)
+			"text" : alignments for each wav
 
 	config: Config object (contains info about model and training)
 	"""
 
 	# Get only files with a label
-	train_textgrid_paths = glob.glob(base_path + "/aligned/train*/*/*/*.TextGrid")
-	train_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in train_textgrid_paths]
+	train_textgrid_paths = glob.glob(base_path + "/text/train*/*/*/*.TextGrid")
+	train_wav_paths = [path.replace("text", "audio").replace(".TextGrid", ".wav") for path in train_textgrid_paths]
 	valid_textgrid_paths = glob.glob(base_path + "/aligned/dev*/*/*/*.TextGrid")
-	valid_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in valid_textgrid_paths]
+	valid_wav_paths = [path.replace("text", "audio").replace(".TextGrid", ".wav") for path in valid_textgrid_paths]
 	test_textgrid_paths = glob.glob(base_path + "/aligned/test*/*/*/*.TextGrid")
-	test_wav_paths = [path.replace("aligned", "LibriSpeech").replace(".TextGrid", ".wav") for path in test_textgrid_paths]
+	test_wav_paths = [path.replace("text", "audio").replace(".TextGrid", ".wav") for path in test_textgrid_paths]
 	
 	# Get list of phonemes and words
 	print("Getting vocabulary...")
