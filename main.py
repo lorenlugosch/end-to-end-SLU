@@ -9,7 +9,7 @@ config = read_config("cfg/pretrained_model.cfg")
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets from folder
-path = "data/librispeech"
+path = "/home/ubuntu/data/librispeech"
 train_dataset, valid_dataset, test_dataset = get_datasets(path, config)
 
 # Initialize model
