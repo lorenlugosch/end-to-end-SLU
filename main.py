@@ -14,7 +14,7 @@ train_dataset, valid_dataset, test_dataset = get_datasets(path, config)
 
 # Initialize model
 model = PretrainedModel(config=config)
-model = torch.load("pretrained_model_state.pth")
+# model = torch.load("pretrained_model_state.pth")
 
 # Train the model
 trainer = Trainer(model=model, config=config)
