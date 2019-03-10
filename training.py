@@ -17,6 +17,7 @@ class Trainer:
 		else:
 			dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
 
+		if randomize_length: dataset.randomize_length = True
 		train_phone_acc = 0
 		train_phone_loss = 0
 		train_word_acc = 0
@@ -24,7 +25,6 @@ class Trainer:
 		num_examples = 0
 		self.model.train()
 		for idx, batch in enumerate(tqdm(dataset.loader)):
-			if randomize_length: dataset.max_length = int((torch.rand(1)*6 + 0.5) * self.config.fs)
 			x,y_phoneme,y_word = batch
 			batch_size = len(x)
 			print(x.shape)

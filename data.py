@@ -120,6 +120,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		self.wav_paths = wav_paths # list of wav file paths
 		self.textgrid_paths = textgrid_paths # list of textgrid file paths
 		self.max_length = 80000 # truncate audios longer than this
+		self.randomize_length = False
 		self.Sy_phoneme = Sy_phoneme
 		self.Sy_word = Sy_word
 		self.phone_downsample_factor = config.phone_downsample_factor
@@ -159,6 +160,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 			if word.mark == '': word_index = -1
 			y_word += [word_index] * round(duration * fs)
 
+		if self.randomize_length: self.max_length = int((torch.rand(1)*6 + 0.5) * fs)
 		if len(x) <= self.max_length:
 			start = 0
 		else:
