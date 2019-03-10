@@ -202,10 +202,10 @@ class CollateWavs:
 			x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
 
 			y_pad_length = (U_phoneme - len(y_phoneme[index]))
-			y_phoneme[index] = torch.nn.functional.pad(y_phoneme[index], (0,y_pad_length))
+			y_phoneme[index] = torch.nn.functional.pad(y_phoneme[index], (0,y_pad_length), value=-1)
 			
 			y_pad_length = (U_word - len(y_word[index]))
-			y_word[index] = torch.nn.functional.pad(y_word[index], (0,y_pad_length))
+			y_word[index] = torch.nn.functional.pad(y_word[index], (0,y_pad_length), value=-1)
 
 		x = torch.stack(x)
 		y_phoneme = torch.stack(y_phoneme)
