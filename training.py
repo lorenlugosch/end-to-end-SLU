@@ -27,6 +27,7 @@ class Trainer:
 			if randomize_length: dataset.max_length = int((torch.rand(1)*6 + 0.5) * self.config.fs)
 			x,y_phoneme,y_word = batch
 			batch_size = len(x)
+			print(x.shape)
 			num_examples += batch_size
 			phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
 			loss = phoneme_loss + word_loss
