@@ -10,7 +10,7 @@ class Trainer:
 		self.config = config
 		self.epoch = -1
 		
-	def train(self, dataset, print_interval=100):
+	def train(self, dataset, print_interval=100, randomize_length=True):
 		self.epoch += 1
 		if self.epoch < len(self.config.pretraining_length_schedule): 
 			dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
@@ -24,6 +24,7 @@ class Trainer:
 		num_examples = 0
 		self.model.train()
 		for idx, batch in enumerate(tqdm(dataset.loader)):
+			if randomize_length: dataset.max_length = int((torch.rand(1)*6 + 0.5) * self.config.fs)
 			x,y_phoneme,y_word = batch
 			batch_size = len(x)
 			num_examples += batch_size
