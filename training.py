@@ -9,15 +9,32 @@ class Trainer:
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 		self.config = config
 		self.epoch = -1
+
+	def load_checkpoint(self, checkpoint_path):
+		if os.path.isfile(os.path.join(checkpoint_path, "model_state.pth")):
+			try:
+				if self.model.is_cuda:
+					self.model.load_state_dict(torch.load(os.path.join(checkpoint_path, "model_state.pth")))
+				else:
+					self.model.load_state_dict(torch.load(os.path.join(checkpoint_path, "model_state.pth"), map_location="cpu"))
+			except:
+				print("Could not load previous model; starting from scratch")
+		else:
+			print("No previous model; starting from scratch")
+
+	def save_checkpoint(self, epoch, checkpoint_path):
+		try:
+			torch.save(self.model.state_dict(), os.path.join(checkpoint_path, "model_state.pth"))
+		except:
+			print("Could not save model")
 		
-	def train(self, dataset, print_interval=100, randomize_length=True):
+	def train(self, dataset, print_interval=100):
 		self.epoch += 1
 		if self.epoch < len(self.config.pretraining_length_schedule): 
 			dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
 		else:
 			dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
 
-		if randomize_length: dataset.randomize_length = True
 		train_phone_acc = 0
 		train_phone_loss = 0
 		train_word_acc = 0
