@@ -5,7 +5,7 @@ import os
 class Trainer:
 	def __init__(self, model, config):
 		self.model = model
-		if torch.cuda.is_available(): self.model = self.model.cuda()
+		# if torch.cuda.is_available(): self.model = self.model.cuda()
 		self.lr = config.lr
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 		self.config = config

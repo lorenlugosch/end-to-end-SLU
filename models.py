@@ -300,7 +300,9 @@ class PretrainedModel(torch.nn.Module):
 
 		self.word_layers = torch.nn.ModuleList(self.word_layers)
 		self.word_linear = torch.nn.Linear(out_dim, config.vocabulary_size)
-
+		self.is_cuda = torch.cuda.is_available()
+		if self.is_cuda:
+			self.cuda()
 
 	def forward(self, x, y_phoneme, y_word):
 		"""
