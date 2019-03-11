@@ -88,17 +88,38 @@ def get_datasets(base_path, config):
 	
 	# Get list of phonemes and words
 	print("Getting vocabulary...")
-	phoneme_counter = Counter()
-	word_counter = Counter()
-	for path in valid_textgrid_paths:
-		tg = textgrid.TextGrid()
-		tg.read(path)
-		phoneme_counter.update([phone.mark.rstrip("0123456789") for phone in tg.getList("phones")[0] if phone.mark != ''])
-		word_counter.update([word.mark for word in tg.getList("words")[0] if word.mark != ''])
+	if os.path.isfile("phonemes.txt") and os.path.isfile("words.txt"):
+		Sy_phoneme = []
+		with open("phonemes.txt", "r") as f:
+			for line in f.readlines():
+				if line.rstrip("\n") != "": Sy_phoneme.append(line.rstrip("\n"))
+		config.num_phonemes = len(Sy_phoneme)
 
-	Sy_phoneme = list(phoneme_counter)
-	Sy_word = [w[0] for w in word_counter.most_common(config.vocabulary_size)]
-	config.num_phonemes = len(Sy_phoneme)
+		Sy_word = []
+		with open("words.txt", "r") as f:
+			for line in f.readlines():
+				if line.rstrip("\n") != "": Sy_word.append(line.rstrip("\n"))
+
+	else:
+		phoneme_counter = Counter()
+		word_counter = Counter()
+		for path in valid_textgrid_paths:
+			tg = textgrid.TextGrid()
+			tg.read(path)
+			phoneme_counter.update([phone.mark.rstrip("0123456789") for phone in tg.getList("phones")[0] if phone.mark != ''])
+			word_counter.update([word.mark for word in tg.getList("words")[0] if word.mark != ''])
+
+		Sy_phoneme = list(phoneme_counter)
+		Sy_word = [w[0] for w in word_counter.most_common(config.vocabulary_size)]
+		config.num_phonemes = len(Sy_phoneme)
+		with open("phonemes.txt", "w") as f:
+			for phoneme in Sy_phoneme:
+				f.write(phoneme + "\n")
+
+		with open("words.txt", "w") as f:
+			for word in Sy_word:
+				f.write(word + "\n")
+
 	print("Done.")
 
 	# Create dataset objects
