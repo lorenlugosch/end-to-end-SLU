@@ -312,7 +312,7 @@ class PretrainedModel(torch.nn.Module):
 
 		Compute loss for y_word and y_phoneme for each x in the batch.
 		"""
-		if torch.cuda.is_available():
+		if self.is_cuda:
 			x = x.cuda()
 			y_phoneme = y_phoneme.cuda()
 			y_word = y_word.cuda()
@@ -337,6 +337,21 @@ class PretrainedModel(torch.nn.Module):
 		word_acc = (word_logits.max(1)[1] == y_word).float().mean()
 
 		return phoneme_loss, word_loss, phoneme_acc, word_acc
+
+	def compute_posteriors(self, x):
+		if self.is_cuda:
+			x = x.cuda()
+
+		out = x.unsqueeze(1)
+		for layer in self.phoneme_layers:
+			out = layer(out)
+		phoneme_logits = self.phoneme_linear(out)
+
+		for layer in self.word_layers:
+			out = layer(out)
+		word_logits = self.word_linear(out)
+
+		return phoneme_logits, word_logits
 
 	def compute_features(self, x):
 		return 1
