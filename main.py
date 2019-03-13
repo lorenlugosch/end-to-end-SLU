@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from models import PretrainedModel, Model
-from data import get_datasets, read_config
+from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
 
 # pre-train, train, or both
