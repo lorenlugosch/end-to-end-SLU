@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm # for displaying progress bar
 import os
+from data import SLUDataset, ASRDataset
 
 class Trainer:
 	def __init__(self, model, config):

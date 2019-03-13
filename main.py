@@ -14,7 +14,7 @@ torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets from folder
 path = "/home/ubuntu/data/librispeech"
-train_dataset, valid_dataset, test_dataset = get_datasets(path, config)
+train_dataset, valid_dataset, test_dataset = get_ASR_datasets(path, config)
 
 # Initialize base model
 pretrained_model = PretrainedModel(config=config)

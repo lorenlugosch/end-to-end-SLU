@@ -368,7 +368,7 @@ class PretrainedModel(torch.nn.Module):
 
 class Model(torch.nn.Module):
 	"""
-	Model for intents.
+	End-to-end SLU model.
 	"""
 	def __init__(self, config, pretrained_model):
 		super(Model, self).__init__()

@@ -7,6 +7,7 @@ import python_speech_features
 import numpy as np
 import configparser
 import textgrid
+import multiprocessing
 
 class Config:
 	def __init__(self):
@@ -66,7 +67,7 @@ def read_config(config_file):
 
 	return config
 
-def get_datasets(base_path, config):
+def get_ASR_datasets(base_path, config):
 	"""
 	base_path: string (directory containing the speech dataset)
 		e.g., "/home/data/librispeech"
@@ -123,13 +124,15 @@ def get_datasets(base_path, config):
 	print("Done.")
 
 	# Create dataset objects
-	train_dataset = SpeechCommandDataset(train_wav_paths, train_textgrid_paths, Sy_phoneme, Sy_word, config)
-	valid_dataset = SpeechCommandDataset(valid_wav_paths, valid_textgrid_paths, Sy_phoneme, Sy_word, config)
-	test_dataset = SpeechCommandDataset(test_wav_paths, test_textgrid_paths, Sy_phoneme, Sy_word, config)
+	train_dataset = ASRDataset(train_wav_paths, train_textgrid_paths, Sy_phoneme, Sy_word, config)
+	valid_dataset = ASRDataset(valid_wav_paths, valid_textgrid_paths, Sy_phoneme, Sy_word, config)
+	test_dataset = ASRDataset(test_wav_paths, test_textgrid_paths, Sy_phoneme, Sy_word, config)
 
 	return train_dataset, valid_dataset, test_dataset
 
-class SpeechCommandDataset(torch.utils.data.Dataset):
+class SLUDataset(torch.utils.data.Dataset):
+
+class ASRDataset(torch.utils.data.Dataset):
 	def __init__(self, wav_paths, textgrid_paths, Sy_phoneme, Sy_word, config):
 		"""
 		wav_paths: list of strings (wav file paths)
@@ -146,7 +149,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 		self.phone_downsample_factor = config.phone_downsample_factor
 		self.word_downsample_factor = config.word_downsample_factor
 		
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=16, shuffle=True, collate_fn=CollateWavs())
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsASR())
 
 	def __len__(self):
 		return len(self.wav_paths)
@@ -192,7 +195,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 
 		return (x, y_phoneme, y_word)
 
-class CollateWavs:
+class CollateWavsASR:
 	# def __init__(self, Sy_phoneme, Sy_word):
 	# 	self.Sy_phoneme = Sy_phoneme
 	# 	self.Sy_word = Sy_word
