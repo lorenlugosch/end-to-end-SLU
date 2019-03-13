@@ -306,7 +306,7 @@ class PretrainedModel(torch.nn.Module):
 
 	def forward(self, x, y_phoneme, y_word):
 		"""
-		x : Tensor of shape (batch size, T), T = 16000
+		x : Tensor of shape (batch size, T)
 		y_phoneme : LongTensor of shape (batch size, T')
 		y_word : LongTensor of shape (batch size, T'')
 
@@ -354,10 +354,74 @@ class PretrainedModel(torch.nn.Module):
 		return phoneme_logits, word_logits
 
 	def compute_features(self, x):
-		return 1
+		if self.is_cuda:
+			x = x.cuda()
 
-	def infer_phonemes(self, x):
-		return 1
+		out = x.unsqueeze(1)
+		for layer in self.phoneme_layers:
+			out = layer(out)
 
-	def infer_words(self, x):
-		return 1
+		for layer in self.word_layers:
+			out = layer(out)
+
+		return out
+
+class Model(torch.nn.Module):
+	"""
+	Model for intents.
+	"""
+	def __init__(self, config, pretrained_model):
+		super(Model, self).__init__()
+		self.pretrained_model = pretrained_model
+		self.intent_layers = []
+		self.values_per_slot = config.values_per_slot
+		self.num_values_total = sum(self.values_per_slot)
+
+		out_dim = config.word_rnn_lay[-1]
+		if config.word_rnn_bidirectional:
+			out_dim *= 2
+		layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.encoder_state_dim, batch_first=True, bidirectional=config.encoder_bidirectional)
+		layer.name = "intent_rnn"
+		self.intent_layers.append(layer)
+
+		out_dim = config.encoder_state_dim
+		if config.encoder_bidirectional:
+			out_dim *= 2
+		layer = torch.nn.Linear(out_dim, self.num_values_total)
+		layer.name = "final_classifier"
+		self.intent_layers.append(layer)
+
+		layer = FinalPool()
+		layer.name = "final_pool"
+		self.intent_layers.append(layer)
+
+		self.intent_layers = torch.nn.ModuleList(self.intent_layers)
+
+		self.is_cuda = torch.cuda.is_available()
+		if self.is_cuda:
+			self.cuda()
+
+	def forward(self, x, y_intent):
+		"""
+		x : Tensor of shape (batch size, T)
+		y_intent : LongTensor of shape (batch size, num_slots)
+		"""
+		out = pretrained_model.compute_features(x)
+
+		for layer in self.intent_layers:
+			out = layer(out)
+		intent_logits = out # shape: (batch size, num_values_total)
+
+		intent_loss = 0.
+		start_idx = 0
+		predicted_intent = []
+		for slot in range(len(self.values_per_slot)):
+			end_idx = start_idx + self.values_per_slot[slot]
+			subset = intent_logits[:, start_idx:end_idx]
+			intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
+			predicted_intent.append(subset.max(1)[1])
+			start_idx = end_idx
+		predicted_intent = torch.stack(predicted_intent, dim=1)
+		intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
+
+		return intent_loss, intent_acc
