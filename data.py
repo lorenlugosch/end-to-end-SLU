@@ -52,11 +52,17 @@ def read_config(config_file):
 	config.vocabulary_size=int(parser.get("word_module", "vocabulary_size"))
 
 	#[pretraining]
-	config.lr=float(parser.get("pretraining", "pretraining_lr"))
-	config.batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
-	config.num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
+	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
+	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
+	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
 	config.seed=int(parser.get("pretraining", "pretraining_seed"))
 	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
+
+	#[training]
+	config.training_lr=float(parser.get("training", "training_lr"))
+	config.training_batch_size=int(parser.get("training", "training_batch_size"))
+	config.training_num_epochs=int(parser.get("training", "training_num_epochs"))
+	config.unfreezing_rate=int(parser.get("training", "unfreezing_rate"))
 
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1
