@@ -55,7 +55,7 @@ def read_config(config_file):
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
 	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
-	config.seed=int(parser.get("pretraining", "pretraining_seed"))
+	config.seed=int(parser.get("pretraining", "seed"))
 	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
 
 	#[training]
