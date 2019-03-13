@@ -8,6 +8,8 @@ import numpy as np
 import configparser
 import textgrid
 import multiprocessing
+import json
+import pandas as pd
 
 class Config:
 	def __init__(self):
@@ -66,6 +68,117 @@ def read_config(config_file):
 		config.word_downsample_factor *= factor
 
 	return config
+
+def get_SLU_datasets(base_path, config):
+	"""
+	base_path: 
+
+	config: Config object (contains info about model and training)
+	"""
+
+	# Split
+	df = pd.read_csv(os.path.join(base_path, "data.csv"))
+	train_indices = np.arange(100)
+	valid_indices = np.arange(100) + 100
+	test_indices = np.arange(100) + 200
+	train_df = df[train_indices].set_index(np.arange(len(train_indices)))
+	valid_df = df[valid_indices].set_index(np.arange(len(valid_indices)))
+	test_df = df[test_indices].set_index(np.arange(len(test_indices)))
+	
+	# Get list of phonemes and words
+	print("Getting transcript-to-intent mapping...")
+	Sy_intent = {}
+	with open(os.path.join(base_path, "json/commands.json"), "r") as f:
+		commands_json = json.load(f)
+	with open(os.path.join(base_path, "json/slots.json"), "r") as f:
+		slots_json = json.load(f)
+
+	for command in commands_json:
+		command_name = command["name"]
+		command_slots = command["slots"]
+		values = []
+		for slot in command_slots:
+			value = command_slots[slot]
+			value_index = slots_json[slot][value]
+			values.append(value_index)
+		Sy_intent[command_name] = values
+
+	print("Done.")
+
+	# Create dataset objects
+	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
+	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
+	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
+
+	return train_dataset, valid_dataset, test_dataset
+
+class SLUDataset(torch.utils.data.Dataset):
+	def __init__(self, df, base_path, Sy_intent, config):
+		"""
+		df:
+		Sy_intent: Dictionary (transcript --> slot values)
+		config: Config object (contains info about model and training)
+		"""
+		self.df = df
+		self.base_path = base_path
+		self.max_length = 80000 # truncate audios longer than this
+		self.Sy_intent = Sy_intent
+		
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
+
+	def __len__(self):
+		return len(self.df)
+
+	def __getitem__(self, idx):
+		wav_path = os.path.join(self.base_path, df[idx].url)
+		command = df[idx].command
+		x, fs = sf.read(wav_path)
+
+		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
+		# if config.use_fbank:
+		# eps = 1e-8
+		# fbank = python_speech_features.fbank(x, nfilt=40, winfunc=np.hamming)
+		# fbank = np.concatenate([fbank[1].reshape(-1,1), fbank[0]], axis=1) + eps
+		# fbank = np.log(fbank)
+		# fbank = (fbank - fbank.mean(0))
+		# fbank = fbank/(np.sqrt(fbank.var(0)))
+
+		if len(x) <= self.max_length:
+			start = 0
+		else:
+			start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
+		end = start + self.max_length
+
+		x = x[start:end]
+		y_intent = self.Sy_intent[command]
+
+		return (x, y_intent)
+
+class CollateWavsSLU:
+	def __call__(self, batch):
+		"""
+		batch: list of tuples (input wav, intent labels)
+
+		Returns a minibatch of wavs and labels as Tensors.
+		"""
+		x = []; y_intent = []
+		batch_size = len(batch)
+		for index in range(batch_size):
+			x_,y_intent_ = batch[index]
+
+			x.append(torch.tensor(x_).float())
+			y_intent.append(torch.tensor(y_intent_).long())
+
+		# pad all sequences to have same length
+		T = max([len(x_) for x_ in x])
+		for index in range(batch_size):
+			x_pad_length = (T - len(x[index]))
+			x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+
+		x = torch.stack(x)
+		y_intent = torch.stack(y_intent)
+
+		return (x,y_intent)
 
 def get_ASR_datasets(base_path, config):
 	"""
@@ -130,8 +243,6 @@ def get_ASR_datasets(base_path, config):
 
 	return train_dataset, valid_dataset, test_dataset
 
-class SLUDataset(torch.utils.data.Dataset):
-
 class ASRDataset(torch.utils.data.Dataset):
 	def __init__(self, wav_paths, textgrid_paths, Sy_phoneme, Sy_word, config):
 		"""
@@ -149,7 +260,7 @@ class ASRDataset(torch.utils.data.Dataset):
 		self.phone_downsample_factor = config.phone_downsample_factor
 		self.word_downsample_factor = config.word_downsample_factor
 		
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsASR())
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.pretraining_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsASR())
 
 	def __len__(self):
 		return len(self.wav_paths)

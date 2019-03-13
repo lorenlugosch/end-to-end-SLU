@@ -366,6 +366,14 @@ class PretrainedModel(torch.nn.Module):
 
 		return out
 
+def freeze_layer(layer):
+	for param in layer.parameters():
+		param.requires_grad = False
+
+def unfreeze_layer(layer):
+	for param in layer.parameters():
+		param.requires_grad = True
+
 class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
@@ -373,6 +381,10 @@ class Model(torch.nn.Module):
 	def __init__(self, config, pretrained_model):
 		super(Model, self).__init__()
 		self.pretrained_model = pretrained_model
+		for layer in pretrained_model.phoneme_layers:
+			freeze_layer(layer)
+		for layer in pretrained_model.word_layers:
+			freeze_layer(layer)
 		self.intent_layers = []
 		self.values_per_slot = config.values_per_slot
 		self.num_values_total = sum(self.values_per_slot)
@@ -383,6 +395,11 @@ class Model(torch.nn.Module):
 		layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.encoder_state_dim, batch_first=True, bidirectional=config.encoder_bidirectional)
 		layer.name = "intent_rnn"
 		self.intent_layers.append(layer)
+
+		# grab hidden states of RNN for each timestep
+		layer = RNNSelect()
+		layer.name = "intent_rnn_select"
+		self.word_layers.append(layer)
 
 		out_dim = config.encoder_state_dim
 		if config.encoder_bidirectional:
