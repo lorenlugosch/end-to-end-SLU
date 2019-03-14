@@ -87,9 +87,9 @@ def get_SLU_datasets(base_path, config):
 	train_indices = np.arange(100)
 	valid_indices = np.arange(100) + 100
 	test_indices = np.arange(100) + 200
-	train_df = df[train_indices].set_index(np.arange(len(train_indices)))
-	valid_df = df[valid_indices].set_index(np.arange(len(valid_indices)))
-	test_df = df[test_indices].set_index(np.arange(len(test_indices)))
+	train_df = df.loc[train_indices].set_index(np.arange(len(train_indices)))
+	valid_df = df.loc[valid_indices].set_index(np.arange(len(valid_indices)))
+	test_df = df.loc[test_indices].set_index(np.arange(len(test_indices)))
 	
 	# Get list of phonemes and words
 	print("Getting transcript-to-intent mapping...")

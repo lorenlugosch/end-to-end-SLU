@@ -60,7 +60,7 @@ if train:
 	trainer.load_checkpoint(checkpoint_path)
 
 	for epoch in range(config.training_num_epochs):
-		print("========= Epoch %d of %d =========" % (epoch+1, config.num_epochs))
+		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.train(train_dataset)
 		valid_intent_acc, valid_intent_loss = trainer.test(valid_dataset)
 
