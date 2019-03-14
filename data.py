@@ -99,6 +99,11 @@ def get_SLU_datasets(base_path, config):
 	with open(os.path.join(base_path, "json/slots.json"), "r") as f:
 		slots_json = json.load(f)
 
+	values_per_slot = []
+	for slot in slots_json:
+		values_per_slot.append(len(slots_json[slot]))
+	config.values_per_slot = values_per_slot
+
 	for command in commands_json:
 		command_name = command["name"]
 		command_slots = command["slots"]
