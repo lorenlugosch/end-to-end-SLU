@@ -2,12 +2,15 @@ import torch
 from tqdm import tqdm # for displaying progress bar
 import os
 from data import SLUDataset, ASRDataset
+from models import PretrainedModel, Model
 
 class Trainer:
 	def __init__(self, model, config):
 		self.model = model
-		# if torch.cuda.is_available(): self.model = self.model.cuda()
-		self.lr = config.lr
+		if isinstance(self.model, PretrainedModel):
+			self.lr = config.pretraining_lr
+		else:
+			self.lr = config.training_lr
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 		self.config = config
 		self.epoch = -1
