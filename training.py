@@ -96,25 +96,40 @@ class Trainer:
 			return train_intent_acc, train_intent_loss
 
 	def test(self, dataset):
-		test_phone_acc = 0
-		test_phone_loss = 0
-		test_word_acc = 0
-		test_word_loss = 0
-		num_examples = 0
-		self.model.eval()
-		for idx, batch in enumerate(dataset.loader):
-			x,y_phoneme,y_word = batch
-			batch_size = len(x)
-			num_examples += batch_size
-			phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
-			# acc = (y * y_hat.cpu()).sum(1).mean()
-			test_phone_loss += phoneme_loss.cpu().data.numpy().item() * batch_size
-			test_word_loss += word_loss.cpu().data.numpy().item() * batch_size
-			test_phone_acc += phoneme_acc.cpu().data.numpy().item() * batch_size
-			test_word_acc += word_acc.cpu().data.numpy().item() * batch_size
-			# test_acc += acc * batch_size
-		test_phone_loss /= num_examples
-		test_phone_acc /= num_examples
-		test_word_loss /= num_examples
-		test_word_acc /= num_examples
-		return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
+		if isinstance(dataset, ASRDataset):
+			test_phone_acc = 0
+			test_phone_loss = 0
+			test_word_acc = 0
+			test_word_loss = 0
+			num_examples = 0
+			self.model.eval()
+			for idx, batch in enumerate(dataset.loader):
+				x,y_phoneme,y_word = batch
+				batch_size = len(x)
+				num_examples += batch_size
+				phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
+				# acc = (y * y_hat.cpu()).sum(1).mean()
+				test_phone_loss += phoneme_loss.cpu().data.numpy().item() * batch_size
+				test_word_loss += word_loss.cpu().data.numpy().item() * batch_size
+				test_phone_acc += phoneme_acc.cpu().data.numpy().item() * batch_size
+				test_word_acc += word_acc.cpu().data.numpy().item() * batch_size
+			test_phone_loss /= num_examples
+			test_phone_acc /= num_examples
+			test_word_loss /= num_examples
+			test_word_acc /= num_examples
+			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
+		else:
+			test_intent_acc = 0
+			test_intent_loss = 0
+			num_examples = 0
+			self.model.eval()
+			for idx, batch in enumerate(dataset.loader):
+				x,y_intent = batch
+				batch_size = len(x)
+				num_examples += batch_size
+				intent_loss, intent_acc = self.model(x,y_intent)
+				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
+				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
+			test_intent_loss /= num_examples
+			test_intent_acc /= num_examples
+			return test_intent_acc, test_intent_loss 
