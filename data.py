@@ -51,6 +51,17 @@ def read_config(config_file):
 	config.word_rnn_bidirectional=(parser.get("word_module", "word_rnn_bidirectional") == "True")
 	config.vocabulary_size=int(parser.get("word_module", "vocabulary_size"))
 
+	#[intent_module]
+	# config.intent_rnn_type=gru
+	config.encoder_state_dim=int(parser.get("intent_module", "encoder_state_dim"))
+	config.decoder_state_dim=int(parser.get("intent_module", "decoder_state_dim"))
+	config.key_dim=int(parser.get("intent_module", "key_dim"))
+	config.value_dim=int(parser.get("intent_module", "value_dim"))
+	config.encoder_bidirectional=True
+	config.encoder_drop=float(parser.get("intent_module", "encoder_drop"))
+	config.decoder_drop=float(parser.get("intent_module", "decoder_drop"))
+
+
 	#[pretraining]
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
