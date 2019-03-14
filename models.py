@@ -423,6 +423,8 @@ class Model(torch.nn.Module):
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
+		if self.is_cuda:
+			y_intent = y_intent.cuda()
 		out = pretrained_model.compute_features(x)
 
 		for layer in self.intent_layers:
