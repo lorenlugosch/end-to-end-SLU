@@ -153,7 +153,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		wav_path = os.path.join(self.base_path, df[idx].url)
-		command = df[idx].command
+		command = self.df[idx].command
 		x, fs = sf.read(wav_path)
 
 		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
