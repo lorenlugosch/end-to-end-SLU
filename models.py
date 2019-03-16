@@ -425,7 +425,7 @@ class Model(torch.nn.Module):
 		"""
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
-		out = pretrained_model.compute_features(x)
+		out = self.pretrained_model.compute_features(x)
 
 		for layer in self.intent_layers:
 			out = layer(out)
