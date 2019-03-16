@@ -152,7 +152,7 @@ class SLUDataset(torch.utils.data.Dataset):
 		return len(self.df)
 
 	def __getitem__(self, idx):
-		wav_path = os.path.join(self.base_path, df[idx].url)
+		wav_path = os.path.join(self.base_path, self.df[idx].url)
 		command = self.df[idx].command
 		x, fs = sf.read(wav_path)
 
