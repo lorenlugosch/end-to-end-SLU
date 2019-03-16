@@ -399,7 +399,7 @@ class Model(torch.nn.Module):
 		# grab hidden states of RNN for each timestep
 		layer = RNNSelect()
 		layer.name = "intent_rnn_select"
-		self.word_layers.append(layer)
+		self.intent_layers.append(layer)
 
 		out_dim = config.encoder_state_dim
 		if config.encoder_bidirectional:
