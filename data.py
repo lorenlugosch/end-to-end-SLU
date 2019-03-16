@@ -152,8 +152,8 @@ class SLUDataset(torch.utils.data.Dataset):
 		return len(self.df)
 
 	def __getitem__(self, idx):
-		wav_path = os.path.join(self.base_path, self.df[idx].url)
-		command = self.df[idx].command
+		wav_path = os.path.join(self.base_path, self.df.loc[idx].url)
+		command = self.df.loc[idx].command
 		x, fs = sf.read(wav_path)
 
 		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
