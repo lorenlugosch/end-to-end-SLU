@@ -94,36 +94,21 @@ def get_SLU_datasets(base_path, config):
 	"""
 
 	# Split
-	df = pd.read_csv(os.path.join(base_path, "data.csv"))
-	train_indices = np.arange(100)
-	valid_indices = np.arange(100) + 100
-	test_indices = np.arange(100) + 200
-	train_df = df.loc[train_indices].set_index(np.arange(len(train_indices)))
-	valid_df = df.loc[valid_indices].set_index(np.arange(len(valid_indices)))
-	test_df = df.loc[test_indices].set_index(np.arange(len(test_indices)))
+	train_df = pd.read_csv(os.path.join(base_path, "train.csv"))
+	valid_df = pd.read_csv(os.path.join(base_path, "valid.csv"))
+	test_df = pd.read_csv(os.path.join(base_path, "test.csv"))
 	
-	# Get list of phonemes and words
-	print("Getting transcript-to-intent mapping...")
-	Sy_intent = {}
-	with open(os.path.join(base_path, "json/commands.json"), "r") as f:
-		commands_json = json.load(f)
-	with open(os.path.join(base_path, "json/slots.json"), "r") as f:
-		slots_json = json.load(f)
+	# Get list of slots
+	print("Getting value-to-int mapping...")
+	Sy_intent = {"action": {}, "object": {}, "location": {}}
 
 	values_per_slot = []
-	for slot in slots_json:
-		values_per_slot.append(len(slots_json[slot]))
+	for slot in ["action", "object", "location"]:
+		slot_values = Counter(train_df[slot])
+		for idx,value in enumerate(slot_values):
+			Sy_intent[slot][value] = idx
+		values_per_slot.append(len(slot_values))
 	config.values_per_slot = values_per_slot
-
-	for command in commands_json:
-		command_name = command["name"]
-		command_slots = command["slots"]
-		values = []
-		for slot in command_slots:
-			value = command_slots[slot]
-			value_index = slots_json[slot][value]
-			values.append(value_index)
-		Sy_intent[command_name] = values
 
 	print("Done.")
 
@@ -153,7 +138,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].url)
-		command = self.df.loc[idx].command
+		# command = self.df.loc[idx].command
 		x, fs = sf.read(wav_path)
 
 		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
@@ -172,7 +157,10 @@ class SLUDataset(torch.utils.data.Dataset):
 		end = start + self.max_length
 
 		x = x[start:end]
-		y_intent = self.Sy_intent[command]
+		y_intent = [] 
+		for slot in ["action", "object", "location"]:
+			value = self.df.loc[idx][slot]
+			y_intent.append(self.Sy_intent[slot][value])
 
 		return (x, y_intent)
 
