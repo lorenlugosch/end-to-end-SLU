@@ -401,6 +401,10 @@ class Model(torch.nn.Module):
 		layer.name = "intent_rnn_select"
 		self.intent_layers.append(layer)
 
+		layer = torch.nn.Dropout(p=config.encoder_drop)
+		layer.name = "intent_dropout%d" % idx
+		self.word_layers.append(layer)
+
 		out_dim = config.encoder_state_dim
 		if config.encoder_bidirectional:
 			out_dim *= 2
