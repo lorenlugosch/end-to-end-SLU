@@ -35,13 +35,14 @@ class Trainer:
 		
 	def train(self, dataset, print_interval=100):
 		self.epoch += 1
-		if self.epoch < len(self.config.pretraining_length_schedule): 
-			dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
-		else:
-			dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
-
+		
 		# TODO: refactor to remove if-statement?
 		if isinstance(dataset, ASRDataset):
+			if self.epoch < len(self.config.pretraining_length_schedule): 
+				dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
+			else:
+				dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
+
 			train_phone_acc = 0
 			train_phone_loss = 0
 			train_word_acc = 0
