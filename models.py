@@ -18,7 +18,8 @@ def sinc(band,t_right):
 	y_right= torch.sin(2*math.pi*band*t_right)/(2*math.pi*band*t_right)
 	y_left= flip(y_right,0)
 
-	y=torch.cat([y_left,(torch.ones(1)).cuda(),y_right])
+	if t_right.is_cuda: y=torch.cat([y_left,(torch.ones(1)).cuda(),y_right])
+	else: y=torch.cat([y_left,(torch.ones(1)),y_right])
 
 	return y
 
