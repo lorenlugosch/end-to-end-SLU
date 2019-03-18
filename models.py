@@ -49,7 +49,7 @@ class SincLayer(torch.nn.Module):
 	"""
 	Modified from https://github.com/mravanelli/SincNet/blob/master/dnn_models.py:sinc_conv
 	"""
-	def __init__(self, N_filt,Filt_dim,fs, stride=1, padding=0):
+	def __init__(self, N_filt,Filt_dim,fs, stride=1, padding=0, is_cuda=False):
 		super(SincLayer,self).__init__()
 
 		# Mel Initialization of the filterbanks
@@ -71,11 +71,14 @@ class SincLayer(torch.nn.Module):
 		self.fs=fs
 		self.stride=stride
 		self.padding=padding
+		self.is_cuda = is_cuda
 
 	def forward(self, x):
-		filters=torch.zeros((self.N_filt,self.Filt_dim)).cuda()
+		filters=torch.zeros((self.N_filt,self.Filt_dim)) #.cuda()
+		if self.is_cuda: filters = filters.cuda()
 		N=self.Filt_dim
-		t_right=(torch.linspace(1, (N-1)/2, steps=int((N-1)/2))/self.fs).cuda()
+		t_right=(torch.linspace(1, (N-1)/2, steps=int((N-1)/2))/self.fs) #.cuda()
+		if self.is_cuda: t_right = t_right.cuda()
 
 		min_freq=50.0;
 		min_band=50.0;
@@ -87,7 +90,8 @@ class SincLayer(torch.nn.Module):
 
 		# Filter window (hamming)
 		window=0.54-0.46*torch.cos(2*math.pi*n/N);
-		window=window.float().cuda()
+		window=window.float() #.cuda()
+		if self.is_cuda: window = window.cuda()
 
 		for i in range(self.N_filt):
 			low_pass1 = 2*filt_beg_freq[i].float()*sinc(filt_beg_freq[i].float()*self.freq_scale,t_right)
@@ -95,8 +99,9 @@ class SincLayer(torch.nn.Module):
 			band_pass=(low_pass2-low_pass1)
 
 			band_pass=band_pass/torch.max(band_pass)
+			if self.is_cuda: band_pass = band_pass.cuda()
 
-			filters[i,:]=band_pass.cuda()*window
+			filters[i,:]=band_pass*window
 
 			out=torch.nn.functional.conv1d(x, filters.view(self.N_filt,1,self.Filt_dim), stride=self.stride, padding=self.padding)
 
@@ -168,6 +173,7 @@ class PretrainedModel(torch.nn.Module):
 		super(PretrainedModel, self).__init__()
 		self.phoneme_layers = []
 		self.word_layers = []
+		self.is_cuda = torch.cuda.is_available()
 
 		# CNN
 		num_conv_layers = len(config.cnn_N_filt)
@@ -185,7 +191,7 @@ class PretrainedModel(torch.nn.Module):
 				# 	self.layers.append(layer)
 
 				if config.use_sincnet:
-					layer = SincLayer(config.cnn_N_filt[idx], config.cnn_len_filt[idx], config.fs, stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2)
+					layer = SincLayer(config.cnn_N_filt[idx], config.cnn_len_filt[idx], config.fs, stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2, is_cuda=self.is_cuda)
 					layer.name = "sinc%d" % idx
 					self.phoneme_layers.append(layer)
 				else:
@@ -300,7 +306,6 @@ class PretrainedModel(torch.nn.Module):
 
 		self.word_layers = torch.nn.ModuleList(self.word_layers)
 		self.word_linear = torch.nn.Linear(out_dim, config.vocabulary_size)
-		self.is_cuda = torch.cuda.is_available()
 		if self.is_cuda:
 			self.cuda()
 
