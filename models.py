@@ -454,3 +454,21 @@ class Model(torch.nn.Module):
 		intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
 		return intent_loss, intent_acc
+
+	def predict_intents(self, x):
+		out = self.pretrained_model.compute_features(x)
+
+		for layer in self.intent_layers:
+			out = layer(out)
+		intent_logits = out # shape: (batch size, num_values_total)
+
+		start_idx = 0
+		predicted_intent = []
+		for slot in range(len(self.values_per_slot)):
+			end_idx = start_idx + self.values_per_slot[slot]
+			subset = intent_logits[:, start_idx:end_idx]
+			predicted_intent.append(subset.max(1)[1])
+			start_idx = end_idx
+		predicted_intent = torch.stack(predicted_intent, dim=1)
+
+		return intent_logits, predicted_intent
