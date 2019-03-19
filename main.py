@@ -48,7 +48,7 @@ if train:
 
 	trainer = Trainer(model=model, config=config)
 	checkpoint_path = "model/"
-	trainer.load_checkpoint(checkpoint_path)
+	# trainer.load_checkpoint(checkpoint_path)
 
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
