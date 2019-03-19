@@ -387,10 +387,10 @@ class Model(torch.nn.Module):
 	def __init__(self, config, pretrained_model):
 		super(Model, self).__init__()
 		self.pretrained_model = pretrained_model
-		for layer in pretrained_model.phoneme_layers:
-			freeze_layer(layer)
-		for layer in pretrained_model.word_layers:
-			freeze_layer(layer)
+		# for layer in pretrained_model.phoneme_layers:
+		# 	freeze_layer(layer)
+		# for layer in pretrained_model.word_layers:
+		# 	freeze_layer(layer)
 		self.intent_layers = []
 		self.values_per_slot = config.values_per_slot
 		self.num_values_total = sum(self.values_per_slot)
