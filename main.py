@@ -102,4 +102,4 @@ phoneme_logits, word_logits = model.pretrained_model.compute_posteriors(x)
 phonemes = [Sy_phoneme[p] for p in phoneme_logits[0].max(1)[1]]
 words = [Sy_word[p] for p in word_logits[0].max(1)[1]]
 intent_logits, predicted_intent = model.predict_intents(x)
-if (predicted_intent == y_intent).prod().item() != 1: break
+# if (predicted_intent == y_intent).prod().item() != 1: break
