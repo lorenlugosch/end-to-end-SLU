@@ -470,15 +470,15 @@ class Model(torch.nn.Module):
 				self.unfreezing_index += 1
 				return
 
-		global_index = 1
-		while global_index <= len(self.pretrained_model.phoneme_layers):
-			layer = self.pretrained_model.phoneme_layers[-global_index]
-			unfreeze_layer(layer)
-			if has_params(layer): trainable_index += 1
-			global_index += 1
-			if trainable_index == self.unfreezing_index:
-				self.unfreezing_index += 1
-				return
+		# global_index = 1
+		# while global_index <= len(self.pretrained_model.phoneme_layers):
+		# 	layer = self.pretrained_model.phoneme_layers[-global_index]
+		# 	unfreeze_layer(layer)
+		# 	if has_params(layer): trainable_index += 1
+		# 	global_index += 1
+		# 	if trainable_index == self.unfreezing_index:
+		# 		self.unfreezing_index += 1
+		# 		return
 
 	def forward(self, x, y_intent):
 		"""
