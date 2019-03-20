@@ -74,7 +74,6 @@ def read_config(config_file):
 	config.training_lr=float(parser.get("training", "training_lr"))
 	config.training_batch_size=int(parser.get("training", "training_batch_size"))
 	config.training_num_epochs=int(parser.get("training", "training_num_epochs"))
-	config.unfreezing_rate=int(parser.get("training", "unfreezing_rate"))
 
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1

@@ -23,7 +23,7 @@ pretrained_model = PretrainedModel(config=config)
 # Train the base model
 trainer = Trainer(model=pretrained_model, config=config)
 checkpoint_path = "pretrained_model/"
-# trainer.load_checkpoint(checkpoint_path)
+trainer.load_checkpoint(checkpoint_path)
 
 if pretrain:
 	for epoch in range(config.pretraining_num_epochs):
@@ -94,12 +94,12 @@ def decode(predicted_intent):
 # import time
 # for idx in range(len(valid_dataset)):
 # 	time.sleep(0.5)
-import soundfile as sf
-x, fs = sf.read("")
-x, y_intent = valid_dataset.__getitem__(idx)
-x = torch.stack([torch.tensor(x)]).float(); y_intent = torch.stack([torch.tensor(y_intent)]).long()
-phoneme_logits, word_logits = model.pretrained_model.compute_posteriors(x)
-phonemes = [Sy_phoneme[p] for p in phoneme_logits[0].max(1)[1]]
-words = [Sy_word[p] for p in word_logits[0].max(1)[1]]
-intent_logits, predicted_intent = model.predict_intents(x)
+# import soundfile as sf
+# x, fs = sf.read("")
+# x, y_intent = valid_dataset.__getitem__(idx)
+# x = torch.stack([torch.tensor(x)]).float(); y_intent = torch.stack([torch.tensor(y_intent)]).long()
+# phoneme_logits, word_logits = model.pretrained_model.compute_posteriors(x)
+# phonemes = [Sy_phoneme[p] for p in phoneme_logits[0].max(1)[1]]
+# words = [Sy_word[p] for p in word_logits[0].max(1)[1]]
+# intent_logits, predicted_intent = model.predict_intents(x)
 # if (predicted_intent == y_intent).prod().item() != 1: break

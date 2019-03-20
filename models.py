@@ -380,6 +380,18 @@ def unfreeze_layer(layer):
 	for param in layer.parameters():
 		param.requires_grad = True
 
+def has_params(layer):
+	num_params = sum([p.numel() for p in layer.parameters()])
+	if num_params > 0: return True
+	return False
+
+def is_frozen(layer):
+	for param in layer.parameters():
+		if param.requires_grad: return False
+	return True
+
+
+
 class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
@@ -387,10 +399,8 @@ class Model(torch.nn.Module):
 	def __init__(self, config, pretrained_model):
 		super(Model, self).__init__()
 		self.pretrained_model = pretrained_model
-		# for layer in pretrained_model.phoneme_layers:
-		# 	freeze_layer(layer)
-		# for layer in pretrained_model.word_layers:
-		# 	freeze_layer(layer)
+		self.freeze_all_layers()
+		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
 		self.values_per_slot = config.values_per_slot
 		self.num_values_total = sum(self.values_per_slot)
@@ -427,6 +437,48 @@ class Model(torch.nn.Module):
 		self.is_cuda = torch.cuda.is_available()
 		if self.is_cuda:
 			self.cuda()
+
+	def freeze_all_layers(self):
+		for layer in self.pretrained_model.phoneme_layers:
+			freeze_layer(layer)
+		for layer in self.pretrained_model.word_layers:
+			freeze_layer(layer)
+
+	def print_frozen(self):
+		for layer in self.pretrained_model.phoneme_layers:
+			if has_params(layer):
+				frozen = "frozen" if is_frozen(layer) else "unfrozen"
+				print(layer.name + ": " + frozen)
+		for layer in self.pretrained_model.word_layers:
+			if has_params(layer):
+				frozen = "frozen" if is_frozen(layer) else "unfrozen"
+				print(layer.name + ": " + frozen)
+
+	def unfreeze_one_layer(self):
+		"""
+		ULMFiT-style unfreezing:
+			Unfreeze the next trainable layer
+		"""
+		trainable_index = 0 # which trainable layer
+		global_index = 1 # which layer overall
+		while global_index <= len(self.pretrained_model.word_layers):
+			layer = self.pretrained_model.word_layers[-global_index]
+			unfreeze_layer(layer)
+			if has_params(layer): trainable_index += 1
+			global_index += 1
+			if trainable_index == self.unfreezing_index: 
+				self.unfreezing_index += 1
+				return
+
+		global_index = 1
+		while global_index <= len(self.pretrained_model.phoneme_layers):
+			layer = self.pretrained_model.phoneme_layers[-global_index]
+			unfreeze_layer(layer)
+			if has_params(layer): trainable_index += 1
+			global_index += 1
+			if trainable_index == self.unfreezing_index:
+				self.unfreezing_index += 1
+				return
 
 	def forward(self, x, y_intent):
 		"""

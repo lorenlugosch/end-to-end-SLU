@@ -78,6 +78,7 @@ class Trainer:
 			train_intent_loss = 0
 			num_examples = 0
 			self.model.train()
+			self.model.print_frozen()
 			for idx, batch in enumerate(tqdm(dataset.loader)):
 				x,y_intent = batch
 				batch_size = len(x)
@@ -94,6 +95,7 @@ class Trainer:
 					print("intent acc: " + str(intent_acc.cpu().data.numpy().item()))
 			train_intent_loss /= num_examples
 			train_intent_acc /= num_examples
+			self.model.unfreeze_one_layer()
 			return train_intent_acc, train_intent_loss
 
 	def test(self, dataset):
