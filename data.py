@@ -64,6 +64,7 @@ def read_config(config_file):
 
 	#[pretraining]
 	config.pretraining_type=int(parser.get("pretraining", "pretraining_type")) # 0 - no pre-training, 1 - phoneme pre-training, 2 - word pre-training, 3 - embedding-constrained word pre-training
+	if config.pretraining_type == 2: config.starting_unfreezing_index = 1
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
 	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
