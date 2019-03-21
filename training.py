@@ -69,6 +69,7 @@ class Trainer:
 					print("word loss: " + str(word_loss.cpu().data.numpy().item()))
 					print("phoneme acc: " + str(phoneme_acc.cpu().data.numpy().item()))
 					print("word acc: " + str(word_acc.cpu().data.numpy().item()))
+				break
 			train_phone_loss /= num_examples
 			train_phone_acc /= num_examples
 			train_word_loss /= num_examples
@@ -123,6 +124,7 @@ class Trainer:
 				test_word_loss += word_loss.cpu().data.numpy().item() * batch_size
 				test_phone_acc += phoneme_acc.cpu().data.numpy().item() * batch_size
 				test_word_acc += word_acc.cpu().data.numpy().item() * batch_size
+				break
 			test_phone_loss /= num_examples
 			test_phone_acc /= num_examples
 			test_word_loss /= num_examples
