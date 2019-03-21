@@ -314,7 +314,7 @@ class ASRDataset(torch.utils.data.Dataset):
 		for word in tg.getList("words")[0]:
 			duration = word.maxTime - word.minTime
 			word_index = self.Sy_word.index(word.mark) if word.mark in self.Sy_word else -1
-			if word.mark == '': word_index = -1
+			# if word.mark == '': word_index = -1
 			y_word += [word_index] * round(duration * fs)
 
 		# Cut a snippet of length random_length from the audio
