@@ -40,7 +40,7 @@ class Trainer:
 		if self.df is None:
 			self.df = pd.DataFrame(columns=[field for field in results])
 		self.df.loc[len(self.df)] = results
-		df.to_csv(os.path.join(self.checkpoint_path, "log.csv"))
+		self.df.to_csv(os.path.join(self.checkpoint_path, "log.csv"))
 
 	def train(self, dataset, print_interval=100):
 		# TODO: refactor to remove if-statement?
