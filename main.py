@@ -6,10 +6,10 @@ from training import Trainer
 import argparse
 
 # Get args
-parser = argparse.OptionParser()
-parser.add_option('--pretrain', action='store_true', help='run ASR pre-training')
-parser.add_option('--train', action='store_true', help='run SLU training')
-parser.add_option('--config_path', type=str, help='path to config file with hyperparameters, etc.')
+parser = argparse.ArgumentParser()
+parser.add_argument('--pretrain', action='store_true', help='run ASR pre-training')
+parser.add_argument('--train', action='store_true', help='run SLU training')
+parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
