@@ -16,6 +16,7 @@ class Trainer:
 			self.checkpoint_path = os.path.join(self.config.folder, "training")
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
 		self.epoch = 0
+		self.df = None
 
 	def load_checkpoint(self):
 		if os.path.isfile(os.path.join(self.checkpoint_path, "model_state.pth")):
@@ -35,17 +36,15 @@ class Trainer:
 		except:
 			print("Could not save model")
 
-	def log(self, epoch):
+	def log(self, results):
+		if self.df is None:
+			self.df = pd.DataFrame(columns=[field for field in results])
+		self.df.loc[len(self.df)] = results
+		df.to_csv(os.path.join(self.checkpoint_path, "log.csv"))
 
-		
 	def train(self, dataset, print_interval=100):
 		# TODO: refactor to remove if-statement?
 		if isinstance(dataset, ASRDataset):
-			if self.epoch < len(self.config.pretraining_length_schedule): 
-				dataset.max_length = int(self.config.pretraining_length_schedule[self.epoch] * self.config.fs)
-			else:
-				dataset.max_length = int(self.config.pretraining_length_schedule[-1] * self.config.fs)
-
 			train_phone_acc = 0
 			train_phone_loss = 0
 			train_word_acc = 0
@@ -74,7 +73,8 @@ class Trainer:
 			train_phone_acc /= num_examples
 			train_word_loss /= num_examples
 			train_word_acc /= num_examples
-			# train_acc = train_acc
+			results = {"phone_loss" : train_phone_loss, "phone_acc" : train_phone_acc, "word_loss" : train_word_loss, "word_acc" : train_word_acc, "set": "train"}
+			self.log(results)
 			self.epoch += 1
 			return train_phone_acc, train_phone_loss, train_word_acc, train_word_loss
 		else: # SLUDataset
@@ -100,6 +100,8 @@ class Trainer:
 			train_intent_loss /= num_examples
 			train_intent_acc /= num_examples
 			self.model.unfreeze_one_layer()
+			results = {"intent_loss" : train_intent_loss, "intent_acc" : train_intent_acc, "set": "train"}
+			self.log(results)
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
@@ -125,6 +127,8 @@ class Trainer:
 			test_phone_acc /= num_examples
 			test_word_loss /= num_examples
 			test_word_acc /= num_examples
+			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
+			self.log(results)
 			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
 		else:
 			test_intent_acc = 0
@@ -140,4 +144,6 @@ class Trainer:
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
+			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
+			self.log(results)
 			return test_intent_acc, test_intent_loss 

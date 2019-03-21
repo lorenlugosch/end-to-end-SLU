@@ -80,7 +80,8 @@ def read_config(config_file):
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
 	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
-	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
+	config.pretraining_length_mean=float(parser.get("pretraining", "pretraining_length_mean"))
+	config.pretraining_length_var=float(parser.get("pretraining", "pretraining_length_var"))
 
 	#[training]
 	config.training_lr=float(parser.get("training", "training_lr"))
@@ -273,7 +274,8 @@ class ASRDataset(torch.utils.data.Dataset):
 		"""
 		self.wav_paths = wav_paths # list of wav file paths
 		self.textgrid_paths = textgrid_paths # list of textgrid file paths
-		self.max_length = 200000 # truncate audios longer than this
+		self.length_mean = config.pretraining_length_mean
+		self.length_var = config.pretraining_length_var
 		self.Sy_phoneme = Sy_phoneme
 		self.Sy_word = Sy_word
 		self.phone_downsample_factor = config.phone_downsample_factor
@@ -313,11 +315,13 @@ class ASRDataset(torch.utils.data.Dataset):
 			if word.mark == '': word_index = -1
 			y_word += [word_index] * round(duration * fs)
 
-		if len(x) <= self.max_length:
+		# Cut a snippet of length random_length from the audio
+		random_length = round(fs * max(self.length_mean + self.length_var * torch.randn(1).item(), 0.5))
+		if len(x) <= random_length:
 			start = 0
 		else:
-			start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
-		end = start + self.max_length
+			start = torch.randint(low=0, high=len(x)-random_length, size=(1,)).item()
+		end = start + random_length
 
 		x = x[start:end]
 		y_phoneme = y_phoneme[start:end:self.phone_downsample_factor]
