@@ -7,35 +7,38 @@ from models import PretrainedModel, Model
 class Trainer:
 	def __init__(self, model, config):
 		self.model = model
+		self.config = config
 		if isinstance(self.model, PretrainedModel):
 			self.lr = config.pretraining_lr
+			self.checkpoint_path = os.path.join(self.config.folder, "pretraining")
 		else:
 			self.lr = config.training_lr
+			self.checkpoint_path = os.path.join(self.config.folder, "training")
 		self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
-		self.config = config
-		self.epoch = -1
+		self.epoch = 0
 
-	def load_checkpoint(self, checkpoint_path):
-		if os.path.isfile(os.path.join(checkpoint_path, "model_state.pth")):
+	def load_checkpoint(self):
+		if os.path.isfile(os.path.join(self.checkpoint_path, "model_state.pth")):
 			try:
 				if self.model.is_cuda:
-					self.model.load_state_dict(torch.load(os.path.join(checkpoint_path, "model_state.pth")))
+					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "model_state.pth")))
 				else:
-					self.model.load_state_dict(torch.load(os.path.join(checkpoint_path, "model_state.pth"), map_location="cpu"))
+					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "model_state.pth"), map_location="cpu"))
 			except:
 				print("Could not load previous model; starting from scratch")
 		else:
 			print("No previous model; starting from scratch")
 
-	def save_checkpoint(self, epoch, checkpoint_path):
+	def save_checkpoint(self):
 		try:
-			torch.save(self.model.state_dict(), os.path.join(checkpoint_path, "model_state.pth"))
+			torch.save(self.model.state_dict(), os.path.join(self.checkpoint_path, "model_state.pth"))
 		except:
 			print("Could not save model")
+
+	def log(self, epoch):
+
 		
 	def train(self, dataset, print_interval=100):
-		self.epoch += 1
-		
 		# TODO: refactor to remove if-statement?
 		if isinstance(dataset, ASRDataset):
 			if self.epoch < len(self.config.pretraining_length_schedule): 
@@ -72,6 +75,7 @@ class Trainer:
 			train_word_loss /= num_examples
 			train_word_acc /= num_examples
 			# train_acc = train_acc
+			self.epoch += 1
 			return train_phone_acc, train_phone_loss, train_word_acc, train_word_loss
 		else: # SLUDataset
 			train_intent_acc = 0
@@ -96,6 +100,7 @@ class Trainer:
 			train_intent_loss /= num_examples
 			train_intent_acc /= num_examples
 			self.model.unfreeze_one_layer()
+			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
 	def test(self, dataset):

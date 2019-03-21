@@ -10,6 +10,7 @@ import textgrid
 import multiprocessing
 import json
 import pandas as pd
+from subprocess import call
 
 class Config:
 	def __init__(self):
@@ -19,6 +20,17 @@ def read_config(config_file):
 	config = Config()
 	parser = configparser.ConfigParser()
 	parser.read(config_file)
+
+	#[experiment]
+	config.seed=int(parser.get("experiment", "seed"))
+	config.folder=parser.get("experiment", "folder")
+	
+	# Make a folder containing experiment information
+	if not os.path.isdir(config.folder):
+		os.mkdir(config.folder)
+		os.mkdir(os.path.join(config.folder, "pretraining"))
+		os.mkdir(os.path.join(config.folder, "training"))
+		call("cp " + config_file + " " + os.path.join(config.folder, "experiment.cfg"), shell=True)
 
 	#[phoneme_module]
 	config.use_sincnet=(parser.get("phoneme_module", "use_sincnet") == "True")
@@ -68,7 +80,6 @@ def read_config(config_file):
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
 	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
-	config.seed=int(parser.get("pretraining", "seed"))
 	config.pretraining_length_schedule=[float(x) for x in parser.get("pretraining", "pretraining_length_schedule").split(",")]
 
 	#[training]
@@ -87,12 +98,11 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(base_path, config):
+def get_SLU_datasets(config):
 	"""
-	base_path: 
-
 	config: Config object (contains info about model and training)
 	"""
+	base_path = config.slu_path
 
 	# Split
 	train_df = pd.read_csv(os.path.join(base_path, "train.csv"))
@@ -129,7 +139,7 @@ class SLUDataset(torch.utils.data.Dataset):
 		"""
 		self.df = df
 		self.base_path = base_path
-		self.max_length = 80000 # truncate audios longer than this
+		self.max_length = 200000 # truncate audios longer than this
 		self.Sy_intent = Sy_intent
 		
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
@@ -191,17 +201,15 @@ class CollateWavsSLU:
 
 		return (x,y_intent)
 
-def get_ASR_datasets(base_path, config):
+def get_ASR_datasets(config):
 	"""
-	base_path: string (directory containing the speech dataset)
-		e.g., "/home/data/librispeech"
-
-		Assumes this directory contains the following two directories:
+		Assumes that the data directory contains the following two directories:
 			"audio" : wav files (split into train-clean, train-other, ...)
 			"text" : alignments for each wav
 
 	config: Config object (contains info about model and training)
 	"""
+	base_path = config.asr_path
 
 	# Get only files with a label
 	train_textgrid_paths = glob.glob(base_path + "/text/train*/*/*/*.TextGrid")
@@ -213,15 +221,15 @@ def get_ASR_datasets(base_path, config):
 	
 	# Get list of phonemes and words
 	print("Getting vocabulary...")
-	if os.path.isfile("phonemes.txt") and os.path.isfile("words.txt"):
+	if os.path.isfile(os.path.join(config.folder, "pretraining", "phonemes.txt")) and os.path.isfile(os.path.join(config.folder, "pretraining", "words.txt")):
 		Sy_phoneme = []
-		with open("phonemes.txt", "r") as f:
+		with open(os.path.join(config.folder, "pretraining", "phonemes.txt"), "r") as f:
 			for line in f.readlines():
 				if line.rstrip("\n") != "": Sy_phoneme.append(line.rstrip("\n"))
 		config.num_phonemes = len(Sy_phoneme)
 
 		Sy_word = []
-		with open("words.txt", "r") as f:
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				if line.rstrip("\n") != "": Sy_word.append(line.rstrip("\n"))
 
@@ -232,16 +240,16 @@ def get_ASR_datasets(base_path, config):
 			tg = textgrid.TextGrid()
 			tg.read(path)
 			phoneme_counter.update([phone.mark.rstrip("0123456789") for phone in tg.getList("phones")[0] if phone.mark != ''])
-			word_counter.update([word.mark for word in tg.getList("words")[0] if word.mark != ''])
+			word_counter.update([word.mark for word in tg.getList("words")[0]]) #if word.mark != ''])
 
 		Sy_phoneme = list(phoneme_counter)
 		Sy_word = [w[0] for w in word_counter.most_common(config.vocabulary_size)]
 		config.num_phonemes = len(Sy_phoneme)
-		with open("phonemes.txt", "w") as f:
+		with open(os.path.join(config.folder, "pretraining", "phonemes.txt"), "w") as f:
 			for phoneme in Sy_phoneme:
 				f.write(phoneme + "\n")
 
-		with open("words.txt", "w") as f:
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "w") as f:
 			for word in Sy_word:
 				f.write(word + "\n")
 
@@ -265,7 +273,7 @@ class ASRDataset(torch.utils.data.Dataset):
 		"""
 		self.wav_paths = wav_paths # list of wav file paths
 		self.textgrid_paths = textgrid_paths # list of textgrid file paths
-		self.max_length = 80000 # truncate audios longer than this
+		self.max_length = 200000 # truncate audios longer than this
 		self.Sy_phoneme = Sy_phoneme
 		self.Sy_word = Sy_word
 		self.phone_downsample_factor = config.phone_downsample_factor
