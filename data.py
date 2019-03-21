@@ -234,7 +234,7 @@ def get_ASR_datasets(config):
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
-				if line.rstrip("\n") != "": Sy_word.append(line.rstrip("\n"))
+				Sy_word.append(line.rstrip("\n"))
 
 	else:
 		phoneme_counter = Counter()
