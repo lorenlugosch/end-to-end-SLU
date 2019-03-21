@@ -31,11 +31,11 @@ trainer.load_checkpoint()
 
 if pretrain:
 	for epoch in range(config.pretraining_num_epochs):
-		print("========= Epoch %d of %d =========" % (epoch+1, config.num_epochs))
+		print("========= Epoch %d of %d =========" % (epoch+1, config.pretraining_num_epochs))
 		train_phone_acc, train_phone_loss, train_word_acc, train_word_loss = trainer.train(train_dataset)
 		valid_phone_acc, valid_phone_loss, valid_word_acc, valid_word_loss = trainer.test(valid_dataset)
 
-		print("========= Results: epoch %d of %d =========" % (epoch+1, config.num_epochs))
+		print("========= Results: epoch %d of %d =========" % (epoch+1, config.pretraining_num_epochs))
 		print("*phonemes*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_phone_acc, train_phone_loss, valid_phone_acc, valid_phone_loss) )
 		print("*words*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_word_acc, train_word_loss, valid_word_acc, valid_word_loss) )
 
