@@ -130,7 +130,7 @@ class Trainer:
 			test_phone_acc /= num_examples
 			test_word_loss /= num_examples
 			test_word_acc /= num_examples
-			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
+			results = {"phone_loss" : test_phone_loss, "phone_acc" : test_phone_acc, "word_loss" : test_word_loss, "word_acc" : test_word_acc,"set": "valid"}
 			self.log(results)
 			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
 		else:
