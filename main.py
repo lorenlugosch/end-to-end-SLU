@@ -39,7 +39,7 @@ if pretrain:
 		print("*phonemes*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_phone_acc, train_phone_loss, valid_phone_acc, valid_phone_loss) )
 		print("*words*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_word_acc, train_word_loss, valid_word_acc, valid_word_loss) )
 
-		trainer.save_checkpoint(checkpoint_path)
+		trainer.save_checkpoint()
 
 if train:
 	# Generate datasets from folder
@@ -59,4 +59,4 @@ if train:
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
-		trainer.save_checkpoint(checkpoint_path)
+		trainer.save_checkpoint()
