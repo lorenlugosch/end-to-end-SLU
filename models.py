@@ -339,8 +339,10 @@ class PretrainedModel(torch.nn.Module):
 		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits, y_phoneme, ignore_index=-1)
 		word_loss = torch.nn.functional.cross_entropy(word_logits, y_word, ignore_index=-1)
 
-		phoneme_acc = (phoneme_logits.max(1)[1] == y_phoneme).float().mean()
-		word_acc = (word_logits.max(1)[1] == y_word).float().mean()
+		valid_phoneme_indices = y_phoneme!=-1
+		phoneme_acc = (phoneme_logits.max(1)[1][valid_phoneme_indices] == y_phoneme[valid_phoneme_indices]).float().mean()
+		valid_word_indices = y_word!=-1
+		word_acc = (word_logits.max(1)[1][valid_word_indices] == y_word[valid_word_indices]).float().mean()
 
 		return phoneme_loss, word_loss, phoneme_acc, word_acc
 
