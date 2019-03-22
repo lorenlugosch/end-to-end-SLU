@@ -9,10 +9,12 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--pretrain', action='store_true', help='run ASR pre-training')
 parser.add_argument('--train', action='store_true', help='run SLU training')
+parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
+restart = args.restart
 config_path = args.config_path
 
 # Read config file
@@ -27,7 +29,7 @@ pretrained_model = PretrainedModel(config=config)
 
 # Train the base model
 trainer = Trainer(model=pretrained_model, config=config)
-trainer.load_checkpoint()
+if restart: trainer.load_checkpoint()
 
 if pretrain:
 	for epoch in range(config.pretraining_num_epochs):
@@ -49,7 +51,7 @@ if train:
 	model = Model(config=config, pretrained_model=pretrained_model)
 
 	trainer = Trainer(model=model, config=config)
-	# trainer.load_checkpoint()
+	if restart: trainer.load_checkpoint()
 
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
