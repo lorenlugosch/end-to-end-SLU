@@ -21,17 +21,17 @@ config_path = args.config_path
 config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
-# Generate datasets from folder
-train_dataset, valid_dataset, test_dataset = get_ASR_datasets(config)
-
-# Initialize base model
-pretrained_model = PretrainedModel(config=config)
-
-# Train the base model
-trainer = Trainer(model=pretrained_model, config=config)
-if restart: trainer.load_checkpoint()
-
 if pretrain:
+	# Generate datasets from folder
+	train_dataset, valid_dataset, test_dataset = get_ASR_datasets(config)
+
+	# Initialize base model
+	pretrained_model = PretrainedModel(config=config)
+
+	# Train the base model
+	trainer = Trainer(model=pretrained_model, config=config)
+	if restart: trainer.load_checkpoint()
+	
 	for epoch in range(config.pretraining_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.pretraining_num_epochs))
 		train_phone_acc, train_phone_loss, train_word_acc, train_word_loss = trainer.train(train_dataset)
