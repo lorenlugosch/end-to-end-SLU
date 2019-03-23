@@ -48,7 +48,7 @@ if train:
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
 
 	# Initialize model
-	model = Model(config=config, pretrained_model=pretrained_model)
+	model = Model(config=config)
 
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
