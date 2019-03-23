@@ -30,7 +30,7 @@ def read_config(config_file):
 		os.mkdir(config.folder)
 		os.mkdir(os.path.join(config.folder, "pretraining"))
 		os.mkdir(os.path.join(config.folder, "training"))
-		call("cp " + config_file + " " + os.path.join(config.folder, "experiment.cfg"), shell=True)
+	call("cp " + config_file + " " + os.path.join(config.folder, "experiment.cfg"), shell=True)
 
 	#[phoneme_module]
 	config.use_sincnet=(parser.get("phoneme_module", "use_sincnet") == "True")
