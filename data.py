@@ -115,7 +115,6 @@ def get_SLU_datasets(config):
 	test_df = pd.read_csv(os.path.join(base_path, "test.csv"))
 	
 	# Get list of slots
-	print("Getting value-to-int mapping...")
 	Sy_intent = {"action": {}, "object": {}, "location": {}}
 
 	values_per_slot = []
@@ -126,7 +125,15 @@ def get_SLU_datasets(config):
 		values_per_slot.append(len(slot_values))
 	config.values_per_slot = values_per_slot
 
-	print("Done.")
+	# Get number of phonemes
+	if os.path.isfile(os.path.join(config.folder, "pretraining", "phonemes.txt")):
+		Sy_phoneme = []
+		with open(os.path.join(config.folder, "pretraining", "phonemes.txt"), "r") as f:
+			for line in f.readlines():
+				if line.rstrip("\n") != "": Sy_phoneme.append(line.rstrip("\n"))
+		config.num_phonemes = len(Sy_phoneme)
+	else:
+		print("No phoneme file found.")
 
 	# Create dataset objects
 	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
@@ -225,7 +232,6 @@ def get_ASR_datasets(config):
 	test_wav_paths = [path.replace("text", "audio").replace(".TextGrid", ".wav") for path in test_textgrid_paths]
 	
 	# Get list of phonemes and words
-	print("Getting vocabulary...")
 	if os.path.isfile(os.path.join(config.folder, "pretraining", "phonemes.txt")) and os.path.isfile(os.path.join(config.folder, "pretraining", "words.txt")):
 		Sy_phoneme = []
 		with open(os.path.join(config.folder, "pretraining", "phonemes.txt"), "r") as f:
@@ -239,6 +245,7 @@ def get_ASR_datasets(config):
 				Sy_word.append(line.rstrip("\n"))
 
 	else:
+		print("Getting vocabulary...")
 		phoneme_counter = Counter()
 		word_counter = Counter()
 		for path in valid_textgrid_paths:
