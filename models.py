@@ -404,9 +404,9 @@ class Model(torch.nn.Module):
 		if config.pretraining_type != 0:
 			pretrained_model_path = os.path.join(config.folder, "pretraining", "model_state.pth")
 			pretrained_model.load_state_dict(torch.load(pretrained_model_path))
+			self.freeze_all_layers()
 		self.pretrained_model = pretrained_model
 		self.unfreezing_type = config.unfreezing_type
-		self.freeze_all_layers()
 		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
 		self.values_per_slot = config.values_per_slot

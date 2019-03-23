@@ -31,7 +31,7 @@ if pretrain:
 	# Train the base model
 	trainer = Trainer(model=pretrained_model, config=config)
 	if restart: trainer.load_checkpoint()
-	
+
 	for epoch in range(config.pretraining_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.pretraining_num_epochs))
 		train_phone_acc, train_phone_loss, train_word_acc, train_word_loss = trainer.train(train_dataset)
@@ -44,12 +44,13 @@ if pretrain:
 		trainer.save_checkpoint()
 
 if train:
-	# Generate datasets from folder
+	# Generate datasets
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
 
-	# Initialize model
+	# Initialize final model
 	model = Model(config=config)
 
+	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
 
