@@ -22,7 +22,7 @@ config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 if pretrain:
-	# Generate datasets from folder
+	# Generate datasets
 	train_dataset, valid_dataset, test_dataset = get_ASR_datasets(config)
 
 	# Initialize base model

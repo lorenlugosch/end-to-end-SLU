@@ -91,6 +91,7 @@ def read_config(config_file):
 	config.training_lr=float(parser.get("training", "training_lr"))
 	config.training_batch_size=int(parser.get("training", "training_batch_size"))
 	config.training_num_epochs=int(parser.get("training", "training_num_epochs"))
+	config.dataset_subset_percentage=float(parser.get("training", "dataset_subset_percentage"))
 
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1
@@ -134,6 +135,12 @@ def get_SLU_datasets(config):
 		config.num_phonemes = len(Sy_phoneme)
 	else:
 		print("No phoneme file found.")
+
+	# Select random subset of training data
+	if config.dataset_subset_percentage < 1:
+		subset_size = round(config.dataset_subset_percentage * len(train_df))
+		train_df = train_df.loc[np.random.choice(len(train_df), subset_size, replace=False)]
+		train_df = train_df.set_index(np.arange(len(train_df)))
 
 	# Create dataset objects
 	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
