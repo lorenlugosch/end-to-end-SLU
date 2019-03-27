@@ -67,8 +67,8 @@ def read_config(config_file):
 	#[pretraining]
 	config.asr_path=parser.get("pretraining", "asr_path")
 	config.pretraining_type=int(parser.get("pretraining", "pretraining_type")) # 0 - no pre-training, 1 - phoneme pre-training, 2 - word pre-training, 3 - embedding-constrained word pre-training
-	if config.pretraining_type == 0: config.starting_unfreezing_index = 1 + len(config.word_rnn_lay) + len(config.phone_rnn_lay) + len(config.cnn_N_filt)
-	if config.pretraining_type == 1: config.starting_unfreezing_index = 1 + len(config.word_rnn_lay)
+	if config.pretraining_type == 0: config.starting_unfreezing_index = 1 + len(config.word_rnn_num_hidden) + len(config.phone_rnn_num_hidden) + len(config.cnn_N_filt)
+	if config.pretraining_type == 1: config.starting_unfreezing_index = 1 + len(config.word_rnn_num_hidden)
 	if config.pretraining_type == 2: config.starting_unfreezing_index = 1
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
