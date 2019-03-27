@@ -57,7 +57,7 @@ class Trainer:
 				batch_size = len(x)
 				num_examples += batch_size
 				phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
-				if config.pretraining_type == 1: loss = phoneme_loss
+				if self.config.pretraining_type == 1: loss = phoneme_loss
 				else: loss = phoneme_loss + word_loss
 				self.optimizer.zero_grad()
 				loss.backward()
