@@ -283,6 +283,7 @@ class PretrainedModel(torch.nn.Module):
 
 		self.word_layers = torch.nn.ModuleList(self.word_layers)
 		self.word_linear = torch.nn.Linear(out_dim, config.vocabulary_size)
+		self.pretraining_type = config.pretraining_type
 		if self.is_cuda:
 			self.cuda()
 
@@ -311,7 +312,7 @@ class PretrainedModel(torch.nn.Module):
 		phoneme_acc = (phoneme_logits.max(1)[1][valid_phoneme_indices] == y_phoneme[valid_phoneme_indices]).float().mean()
 
 		# avoid computing 
-		if config.pretraining_type == 1:
+		if self.pretraining_type == 1:
 			word_loss = 0
 			word_acc = 0
 		else:
