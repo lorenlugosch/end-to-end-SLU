@@ -224,15 +224,15 @@ class PretrainedModel(torch.nn.Module):
 		self.phoneme_layers.append(layer)
 
 		# phoneme RNN
-		num_rnn_layers = len(config.phone_rnn_lay)
+		num_rnn_layers = len(config.phone_rnn_num_hidden)
 		out_dim = config.cnn_N_filt[-1]
 		for idx in range(num_rnn_layers):
 			# recurrent
-			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.phone_rnn_lay[idx], batch_first=True, bidirectional=config.phone_rnn_bidirectional)
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.phone_rnn_num_hidden[idx], batch_first=True, bidirectional=config.phone_rnn_bidirectional)
 			layer.name = "phone_rnn%d" % idx
 			self.phoneme_layers.append(layer)
 		
-			out_dim = config.phone_rnn_lay[idx]
+			out_dim = config.phone_rnn_num_hidden[idx]
 			if config.phone_rnn_bidirectional:
 				out_dim *= 2
 
@@ -255,14 +255,14 @@ class PretrainedModel(torch.nn.Module):
 		self.phoneme_linear = torch.nn.Linear(out_dim, config.num_phonemes)
 
 		# word RNN
-		num_rnn_layers = len(config.word_rnn_lay)
+		num_rnn_layers = len(config.word_rnn_num_hidden)
 		for idx in range(num_rnn_layers):
 			# recurrent
-			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.word_rnn_lay[idx], batch_first=True, bidirectional=config.word_rnn_bidirectional)
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.word_rnn_num_hidden[idx], batch_first=True, bidirectional=config.word_rnn_bidirectional)
 			layer.name = "word_rnn%d" % idx
 			self.word_layers.append(layer)
 		
-			out_dim = config.word_rnn_lay[idx]
+			out_dim = config.word_rnn_num_hidden[idx]
 			if config.word_rnn_bidirectional:
 				out_dim *= 2
 
@@ -396,16 +396,16 @@ class Model(torch.nn.Module):
 
 		# intent RNN
 		num_rnn_layers = len(config.intent_rnn_lay)
-		out_dim = config.word_rnn_lay[idx]
+		out_dim = config.word_rnn_num_hidden[idx]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
 		for idx in range(num_rnn_layers):
 			# recurrent
-			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_lay[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
 			layer.name = "intent_rnn%d" % idx
 			self.intent_layers.append(layer)
 		
-			out_dim = config.intent_rnn_lay[idx]
+			out_dim = config.intent_rnn_num_hidden[idx]
 			if config.intent_rnn_bidirectional:
 				out_dim *= 2
 
