@@ -395,7 +395,7 @@ class Model(torch.nn.Module):
 			self.freeze_all_layers()
 
 		# intent RNN
-		num_rnn_layers = len(config.intent_rnn_lay)
+		num_rnn_layers = len(config.intent_rnn_num_hidden)
 		out_dim = config.word_rnn_num_hidden[idx]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
