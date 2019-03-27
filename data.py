@@ -40,23 +40,17 @@ def read_config(config_file):
 	config.cnn_len_filt=[int(x) for x in parser.get("phoneme_module", "cnn_len_filt").split(",")]
 	config.cnn_stride=[int(x) for x in parser.get("phoneme_module", "cnn_stride").split(",")]
 	config.cnn_max_pool_len=[int(x) for x in parser.get("phoneme_module", "cnn_max_pool_len").split(",")]
-	config.cnn_use_laynorm_inp=(parser.get("phoneme_module", "cnn_use_laynorm_inp") == "True")
-	config.cnn_use_batchnorm_inp=(parser.get("phoneme_module", "cnn_use_batchnorm_inp") == "True")
-	config.cnn_use_laynorm=[(x == "True") for x in parser.get("phoneme_module", "cnn_use_laynorm").split(",")]
-	config.cnn_use_batchnorm=[(x == "True") for x in parser.get("phoneme_module", "cnn_use_batchnorm").split(",")]
 	config.cnn_act=[x for x in parser.get("phoneme_module", "cnn_act").split(",")]
 	config.cnn_drop=[float(x) for x in parser.get("phoneme_module", "cnn_drop").split(",")]
 
-	config.phone_rnn_type=parser.get("phoneme_module", "phone_rnn_type")
-	config.phone_rnn_lay=[int(x) for x in parser.get("phoneme_module", "phone_rnn_lay").split(",")]
+	config.phone_rnn_num_hidden=[int(x) for x in parser.get("phoneme_module", "phone_rnn_num_hidden").split(",")]
 	config.phone_downsample_len=[int(x) for x in parser.get("phoneme_module", "phone_downsample_len").split(",")]
 	config.phone_downsample_type=[x for x in parser.get("phoneme_module", "phone_downsample_type").split(",")]
 	config.phone_rnn_drop=[float(x) for x in parser.get("phoneme_module", "phone_rnn_drop").split(",")]
 	config.phone_rnn_bidirectional=(parser.get("phoneme_module", "phone_rnn_bidirectional") == "True")
 
 	#[word_module]
-	config.word_rnn_type=parser.get("word_module", "word_rnn_type")
-	config.word_rnn_lay=[int(x) for x in parser.get("word_module", "word_rnn_lay").split(",")]
+	config.word_rnn_num_hidden=[int(x) for x in parser.get("word_module", "word_rnn_num_hidden").split(",")]
 	config.word_downsample_len=[int(x) for x in parser.get("word_module", "word_downsample_len").split(",")]
 	config.word_downsample_type=[x for x in parser.get("word_module", "word_downsample_type").split(",")]
 	config.word_rnn_drop=[float(x) for x in parser.get("word_module", "word_rnn_drop").split(",")]
@@ -64,14 +58,11 @@ def read_config(config_file):
 	config.vocabulary_size=int(parser.get("word_module", "vocabulary_size"))
 
 	#[intent_module]
-	# config.intent_rnn_type=gru
-	config.encoder_state_dim=int(parser.get("intent_module", "encoder_state_dim"))
-	config.decoder_state_dim=int(parser.get("intent_module", "decoder_state_dim"))
-	config.key_dim=int(parser.get("intent_module", "key_dim"))
-	config.value_dim=int(parser.get("intent_module", "value_dim"))
-	config.encoder_bidirectional=True
-	config.encoder_drop=float(parser.get("intent_module", "encoder_drop"))
-	config.decoder_drop=float(parser.get("intent_module", "decoder_drop"))
+	config.intent_rnn_num_hidden=[int(x) for x in parser.get("intent_module", "intent_rnn_num_hidden").split(",")]
+	config.intent_downsample_len=[int(x) for x in parser.get("intent_module", "intent_downsample_len").split(",")]
+	config.intent_downsample_type=[x for x in parser.get("intent_module", "intent_downsample_type").split(",")]
+	config.intent_rnn_drop=[float(x) for x in parser.get("intent_module", "intent_rnn_drop").split(",")]
+	config.intent_rnn_bidirectional=(parser.get("intent_module", "intent_rnn_bidirectional") == "True")
 
 	#[pretraining]
 	config.asr_path=parser.get("pretraining", "asr_path")

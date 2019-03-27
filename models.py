@@ -181,16 +181,6 @@ class PretrainedModel(torch.nn.Module):
 		for idx in range(num_conv_layers):
 			# first conv layer
 			if idx == 0:
-				# if config.cnn_use_batchnorm_inp:
-				# 	layer=torch.nn.BatchNorm1d([self.input_dim],momentum=0.05)
-				# 	layer.name="bn0"
-				# 	self.layers.append(layer)
-
-				# if config.cnn_use_laynorm_inp:
-				# 	layer=LayerNorm(self.input_dim)
-				# 	layer.name="ln0"
-				# 	self.layers.append(layer)
-
 				if config.use_sincnet:
 					layer = SincLayer(config.cnn_N_filt[idx], config.cnn_len_filt[idx], config.fs, stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2, is_cuda=self.is_cuda)
 					layer.name = "sinc%d" % idx
@@ -209,18 +199,6 @@ class PretrainedModel(torch.nn.Module):
 				layer = torch.nn.Conv1d(config.cnn_N_filt[idx-1], config.cnn_N_filt[idx], config.cnn_len_filt[idx], stride=config.cnn_stride[idx], padding=config.cnn_len_filt[idx]//2)
 				layer.name = "conv%d" % idx
 				self.phoneme_layers.append(layer)
-
-			# # batch norm
-			# if config.cnn_use_batchnorm[idx]: 
-			# 	layer = torch.nn.BatchNorm1d([self.input_dim],momentum=0.05)
-			# 	layer.name = "bn%d" % idx
-			# 	self.layers.append(layer)
-
-			# # layer norm
-			# if config.cnn_use_laynorm[idx]:
-			# 	layer = LayerNorm()
-			# 	layer.name = "ln%d" % idx
-			# 	self.layers.append(layer)
 
 			# pool
 			layer = torch.nn.MaxPool1d(config.cnn_max_pool_len[idx], ceil_mode=True)
@@ -250,8 +228,7 @@ class PretrainedModel(torch.nn.Module):
 		out_dim = config.cnn_N_filt[-1]
 		for idx in range(num_rnn_layers):
 			# recurrent
-			if config.phone_rnn_type == "gru":
-				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.phone_rnn_lay[idx], batch_first=True, bidirectional=config.phone_rnn_bidirectional)
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.phone_rnn_lay[idx], batch_first=True, bidirectional=config.phone_rnn_bidirectional)
 			layer.name = "phone_rnn%d" % idx
 			self.phoneme_layers.append(layer)
 		
@@ -281,8 +258,7 @@ class PretrainedModel(torch.nn.Module):
 		num_rnn_layers = len(config.word_rnn_lay)
 		for idx in range(num_rnn_layers):
 			# recurrent
-			if config.word_rnn_type == "gru":
-				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.word_rnn_lay[idx], batch_first=True, bidirectional=config.word_rnn_bidirectional)
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.word_rnn_lay[idx], batch_first=True, bidirectional=config.word_rnn_bidirectional)
 			layer.name = "word_rnn%d" % idx
 			self.word_layers.append(layer)
 		
@@ -330,19 +306,24 @@ class PretrainedModel(torch.nn.Module):
 		phoneme_logits = phoneme_logits.view(phoneme_logits.shape[0]*phoneme_logits.shape[1], -1)
 		y_phoneme = y_phoneme.view(-1)
 
-		for layer in self.word_layers:
-			out = layer(out)
-		word_logits = self.word_linear(out)
-		word_logits = word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1)
-		y_word = y_word.view(-1)
-
 		phoneme_loss = torch.nn.functional.cross_entropy(phoneme_logits, y_phoneme, ignore_index=-1)
-		word_loss = torch.nn.functional.cross_entropy(word_logits, y_word, ignore_index=-1)
-
 		valid_phoneme_indices = y_phoneme!=-1
 		phoneme_acc = (phoneme_logits.max(1)[1][valid_phoneme_indices] == y_phoneme[valid_phoneme_indices]).float().mean()
-		valid_word_indices = y_word!=-1
-		word_acc = (word_logits.max(1)[1][valid_word_indices] == y_word[valid_word_indices]).float().mean()
+
+		# avoid computing 
+		if config.pretraining_type == 1:
+			word_loss = 0
+			word_acc = 0
+		else:
+			for layer in self.word_layers:
+				out = layer(out)
+			word_logits = self.word_linear(out)
+			word_logits = word_logits.view(word_logits.shape[0]*word_logits.shape[1], -1)
+			y_word = y_word.view(-1)
+
+			word_loss = torch.nn.functional.cross_entropy(word_logits, y_word, ignore_index=-1)
+			valid_word_indices = y_word!=-1
+			word_acc = (word_logits.max(1)[1][valid_word_indices] == y_word[valid_word_indices]).float().mean()
 
 		return phoneme_loss, word_loss, phoneme_acc, word_acc
 
