@@ -313,8 +313,8 @@ class PretrainedModel(torch.nn.Module):
 
 		# avoid computing 
 		if self.pretraining_type == 1:
-			word_loss = 0
-			word_acc = 0
+			word_loss = torch.tensor([0.])
+			word_acc = torch.tensor([0.])
 		else:
 			for layer in self.word_layers:
 				out = layer(out)
