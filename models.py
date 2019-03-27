@@ -394,25 +394,36 @@ class Model(torch.nn.Module):
 		if config.pretraining_type != 0:
 			self.freeze_all_layers()
 
-		out_dim = config.word_rnn_lay[-1]
+		# intent RNN
+		num_rnn_layers = len(config.intent_rnn_lay)
+		out_dim = config.word_rnn_lay[idx]
 		if config.word_rnn_bidirectional:
-			out_dim *= 2
-		layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.encoder_state_dim, batch_first=True, bidirectional=config.encoder_bidirectional)
-		layer.name = "intent_rnn"
-		self.intent_layers.append(layer)
+			out_dim *= 2 
+		for idx in range(num_rnn_layers):
+			# recurrent
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_lay[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
+			layer.name = "intent_rnn%d" % idx
+			self.intent_layers.append(layer)
+		
+			out_dim = config.intent_rnn_lay[idx]
+			if config.intent_rnn_bidirectional:
+				out_dim *= 2
 
-		# grab hidden states of RNN for each timestep
-		layer = RNNSelect()
-		layer.name = "intent_rnn_select"
-		self.intent_layers.append(layer)
+			# grab hidden states of RNN for each timestep
+			layer = RNNSelect()
+			layer.name = "intent_rnn_select%d" % idx
+			self.intent_layers.append(layer)
 
-		layer = torch.nn.Dropout(p=config.encoder_drop)
-		layer.name = "intent_dropout"
-		self.intent_layers.append(layer)
+			# dropout
+			layer = torch.nn.Dropout(p=config.intent_rnn_drop[idx])
+			layer.name = "intent_dropout%d" % idx
+			self.intent_layers.append(layer)
 
-		out_dim = config.encoder_state_dim
-		if config.encoder_bidirectional:
-			out_dim *= 2
+			# downsample
+			layer = Downsample(method=config.intent_downsample_type[idx], factor=config.intent_downsample_len[idx], axis=1)
+			layer.name = "intent_downsample%d" % idx
+			self.intent_layers.append(layer)
+
 		layer = torch.nn.Linear(out_dim, self.num_values_total)
 		layer.name = "final_classifier"
 		self.intent_layers.append(layer)
