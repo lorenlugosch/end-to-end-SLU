@@ -11,14 +11,20 @@ parser.add_argument('--pretrain', action='store_true', help='run ASR pre-trainin
 parser.add_argument('--train', action='store_true', help='run SLU training')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
+parser.add_argument('--train_wording_path', type=str, default=None, help='path to .txt file containing wordings that will be allowed during training')
+parser.add_argument('--test_wording_path', type=str, default=None, help='path to .txt file containing wordings that will be allowed during validation/testing')
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
 restart = args.restart
 config_path = args.config_path
+train_wording_path = args.train_wording_path
+test_wording_path = args.test_wording_path
 
 # Read config file
 config = read_config(config_path)
+config.train_wording_path = train_wording_path
+config.test_wording_path = test_wording_path
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 if pretrain:
