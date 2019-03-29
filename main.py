@@ -16,7 +16,6 @@ parser.add_argument('--test_wording_path', type=str, default=None, help='path to
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
-test = args.test
 restart = args.restart
 config_path = args.config_path
 train_wording_path = args.train_wording_path
