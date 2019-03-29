@@ -16,6 +16,7 @@ parser.add_argument('--test_wording_path', type=str, default=None, help='path to
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
+test = args.test
 restart = args.restart
 config_path = args.config_path
 train_wording_path = args.train_wording_path
@@ -69,3 +70,5 @@ if train:
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 		trainer.save_checkpoint()
+
+	test_intent_acc, test_intent_loss = trainer.test(test_dataset)
