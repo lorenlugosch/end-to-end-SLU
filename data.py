@@ -3,7 +3,6 @@ import torch.utils.data
 import os, glob
 from collections import Counter
 import soundfile as sf
-import python_speech_features
 import numpy as np
 import configparser
 import textgrid
@@ -117,6 +116,21 @@ def get_SLU_datasets(config):
 		values_per_slot.append(len(slot_values))
 	config.values_per_slot = values_per_slot
 
+	# If certain phrases are specified, only use those phrases
+	if config.train_wording_path is not None:
+		with open(config.train_wording_path, "r") as f:
+			train_wordings = [line.strip() for line in f.readlines()]
+		train_df = train_df.loc[train_df.transcription.isin(train_wordings)]
+		train_df = train_df.set_index(np.arange(len(train_df)))
+
+	if config.test_wording_path is not None:
+		with open(config.test_wording_path, "r") as f:
+			test_wordings = [line.strip() for line in f.readlines()]
+		valid_df = valid_df.loc[valid_df.transcription.isin(test_wordings)]
+		valid_df = valid_df.set_index(np.arange(len(valid_df)))
+		test_df = test_df.loc[test_df.transcription.isin(test_wordings)]
+		test_df = test_df.set_index(np.arange(len(test_df)))
+
 	# Get number of phonemes
 	if os.path.isfile(os.path.join(config.folder, "pretraining", "phonemes.txt")):
 		Sy_phoneme = []
@@ -159,17 +173,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
-		# command = self.df.loc[idx].command
 		x, fs = sf.read(wav_path)
-
-		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
-		# if config.use_fbank:
-		# eps = 1e-8
-		# fbank = python_speech_features.fbank(x, nfilt=40, winfunc=np.hamming)
-		# fbank = np.concatenate([fbank[1].reshape(-1,1), fbank[0]], axis=1) + eps
-		# fbank = np.log(fbank)
-		# fbank = (fbank - fbank.mean(0))
-		# fbank = fbank/(np.sqrt(fbank.var(0)))
 
 		if len(x) <= self.max_length:
 			start = 0
