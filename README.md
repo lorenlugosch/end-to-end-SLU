@@ -1,5 +1,5 @@
 # pretrain_speech_model
-This repo contains the code for replicating the experiments in the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
+This repo contains the code for the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
 
 ## Dependencies
 PyTorch, numpy, soundfile, pandas, tqdm, TextGrid
