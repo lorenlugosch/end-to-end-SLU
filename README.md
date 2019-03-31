@@ -1,4 +1,4 @@
-# pretrain_speech_model
+# Speech Model Pre-training for End-to-End Spoken Language Understanding
 This repo contains the code for the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
 
 ## Dependencies
