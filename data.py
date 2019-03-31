@@ -65,10 +65,11 @@ def read_config(config_file):
 
 	#[pretraining]
 	config.asr_path=parser.get("pretraining", "asr_path")
-	config.pretraining_type=int(parser.get("pretraining", "pretraining_type")) # 0 - no pre-training, 1 - phoneme pre-training, 2 - word pre-training, 3 - embedding-constrained word pre-training
+	config.pretraining_type=int(parser.get("pretraining", "pretraining_type")) # 0 - no pre-training, 1 - phoneme pre-training, 2 - phoneme + word pre-training, 3 - word pre-training
 	if config.pretraining_type == 0: config.starting_unfreezing_index = 1 + len(config.word_rnn_num_hidden) + len(config.phone_rnn_num_hidden) + len(config.cnn_N_filt)
 	if config.pretraining_type == 1: config.starting_unfreezing_index = 1 + len(config.word_rnn_num_hidden)
 	if config.pretraining_type == 2: config.starting_unfreezing_index = 1
+	if config.pretraining_type == 3: config.starting_unfreezing_index = 1
 	config.pretraining_lr=float(parser.get("pretraining", "pretraining_lr"))
 	config.pretraining_batch_size=int(parser.get("pretraining", "pretraining_batch_size"))
 	config.pretraining_num_epochs=int(parser.get("pretraining", "pretraining_num_epochs"))
@@ -82,6 +83,10 @@ def read_config(config_file):
 	config.training_batch_size=int(parser.get("training", "training_batch_size"))
 	config.training_num_epochs=int(parser.get("training", "training_num_epochs"))
 	config.dataset_subset_percentage=float(parser.get("training", "dataset_subset_percentage"))
+	config.train_wording_path=parser.get("training", "train_wording_path")
+	if config.train_wording_path=="None": config.train_wording_path = None
+	config.test_wording_path=parser.get("training", "test_wording_path")
+	if config.test_wording_path=="None": config.test_wording_path = None
 
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1
