@@ -5,16 +5,16 @@ This repo contains the code for the paper "Speech Model Pre-training for End-to-
 PyTorch, numpy, soundfile, pandas, tqdm, TextGrid
 
 ## Usage
-First, change the directories in the config file ```exp1.cfg``` to wherever the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
+First, change the directories in the config file (like ```experiments/no_unfreezing.cfg```, or whichever experiment you want to run) to point to where the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
 
-To pre-train the model on LibriSpeech, run the following command:
+_ASR pre-training:_ Note that the experiment folders in this repo already have a pre-trained LibriSpeech model that you can use. LibriSpeech is pretty big (>100 GB uncompressed), so don't do this part unless you want to re-run the pre-training part with different hyperparameters. To pre-train the model on LibriSpeech, run the following command:
 ```
-python main.py --pretrain --config_path=exp1.cfg
+python main.py --pretrain --config_path=<path to .cfg>
 ```
 
-To train the model on Fluent Speech Commands, run the following command:
+_SLU training:_ To train the model on Fluent Speech Commands, run the following command:
 ```
-python main.py --train --config_path=exp1.cfg
+python main.py --train --config_path=<path to .cfg>
 ```
 
 ## Citation
