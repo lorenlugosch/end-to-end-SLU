@@ -2,7 +2,7 @@
 This repo contains the code for the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
 
 ## Dependencies
-PyTorch, numpy, soundfile, pandas, tqdm, TextGrid
+PyTorch, numpy, soundfile, pandas, tqdm, textgrid.py
 
 ## Usage
 First, change the directories in the config file (like ```experiments/no_unfreezing.cfg```, or whichever experiment you want to run) to point to where the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
