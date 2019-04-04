@@ -1,6 +1,8 @@
 # Speech Model Pre-training for End-to-End Spoken Language Understanding
 This repo contains the code for the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
 
+If you have any questions about this code or have problems getting it to work, please send me an email at ```<the email address listed for me in the paper>```.
+
 ## Dependencies
 PyTorch, numpy, soundfile, pandas, tqdm, textgrid.py
 
