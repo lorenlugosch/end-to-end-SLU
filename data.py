@@ -106,9 +106,9 @@ def get_SLU_datasets(config):
 	base_path = config.slu_path
 
 	# Split
-	train_df = pd.read_csv(os.path.join(base_path, "train.csv"))
-	valid_df = pd.read_csv(os.path.join(base_path, "valid.csv"))
-	test_df = pd.read_csv(os.path.join(base_path, "test.csv"))
+	train_df = pd.read_csv(os.path.join(base_path, "data", "train.csv"))
+	valid_df = pd.read_csv(os.path.join(base_path, "data", "valid.csv"))
+	test_df = pd.read_csv(os.path.join(base_path, "data", "test.csv"))
 	
 	# Get list of slots
 	Sy_intent = {"action": {}, "object": {}, "location": {}}
@@ -307,15 +307,6 @@ class ASRDataset(torch.utils.data.Dataset):
 	def __getitem__(self, idx):
 		x, fs = sf.read(self.wav_paths[idx])
 
-		# https://github.com/jameslyons/python_speech_features/blob/master/python_speech_features/base.py
-		# if config.use_fbank:
-		# eps = 1e-8
-		# fbank = python_speech_features.fbank(x, nfilt=40, winfunc=np.hamming)
-		# fbank = np.concatenate([fbank[1].reshape(-1,1), fbank[0]], axis=1) + eps
-		# fbank = np.log(fbank)
-		# fbank = (fbank - fbank.mean(0))
-		# fbank = fbank/(np.sqrt(fbank.var(0)))
-
 		tg = textgrid.TextGrid()
 		tg.read(self.textgrid_paths[idx])
 
@@ -348,10 +339,6 @@ class ASRDataset(torch.utils.data.Dataset):
 		return (x, y_phoneme, y_word)
 
 class CollateWavsASR:
-	# def __init__(self, Sy_phoneme, Sy_word):
-	# 	self.Sy_phoneme = Sy_phoneme
-	# 	self.Sy_word = Sy_word
-
 	def __call__(self, batch):
 		"""
 		batch: list of tuples (input wav, phoneme labels, word labels)
