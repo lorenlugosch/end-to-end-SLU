@@ -106,9 +106,9 @@ def get_SLU_datasets(config):
 	base_path = config.slu_path
 
 	# Split
-	train_df = pd.read_csv(os.path.join(base_path, "data", "train.csv"))
-	valid_df = pd.read_csv(os.path.join(base_path, "data", "valid.csv"))
-	test_df = pd.read_csv(os.path.join(base_path, "data", "test.csv"))
+	train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv"))
+	valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data.csv"))
+	test_df = pd.read_csv(os.path.join(base_path, "data", "test_data.csv"))
 	
 	# Get list of slots
 	Sy_intent = {"action": {}, "object": {}, "location": {}}
