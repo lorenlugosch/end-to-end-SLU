@@ -1,5 +1,5 @@
 # Speech Model Pre-training for End-to-End Spoken Language Understanding
-This repo contains the code for the paper "Speech Model Pre-training for End-to-End Spoken Language Understanding".
+This repo contains the code for the paper "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)".
 The paper describes the Fluent Speech Commands corpus (released by [Fluent.ai](https://www.fluent.ai/)), which is a free speech command dataset for spoken language understanding ([click here to download it](http://www.fluent.ai/research/fluent-speech-commands/)). The work also explores useful pre-training strategies for end-to-end spoken language understanding.
 
 If you have any questions about this code or have problems getting it to work, please send me an email at ```<the email address listed for Loren in the paper>```.
