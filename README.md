@@ -24,4 +24,4 @@ python main.py --pretrain --config_path=<path to .cfg>
 ## Citation
 If you find this repo or our Fluent Speech Commands dataset useful, please cite our paper:
 
-- Loren Lugosch, Mirco Ravanelli, Patrick Ignoto, Vikrant Singh Tomar, and Yoshua Bengio, "Speech Model Pre-training for End-to-End Spoken Language Understanding", arXiv, 2019.
+- Loren Lugosch, Mirco Ravanelli, Patrick Ignoto, Vikrant Singh Tomar, and Yoshua Bengio, "Speech Model Pre-training for End-to-End Spoken Language Understanding", arXiv:1904.03670, 2019.
