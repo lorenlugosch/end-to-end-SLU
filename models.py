@@ -382,10 +382,14 @@ class Model(torch.nn.Module):
 	"""
 	def __init__(self, config):
 		super(Model, self).__init__()
+		self.is_cuda = torch.cuda.is_available()
 		pretrained_model = PretrainedModel(config)
 		if config.pretraining_type != 0:
 			pretrained_model_path = os.path.join(config.folder, "pretraining", "model_state.pth")
-			pretrained_model.load_state_dict(torch.load(pretrained_model_path))
+			if self.is_cuda:
+				pretrained_model.load_state_dict(torch.load(pretrained_model_path))
+			else:
+				pretrained_model.load_state_dict(torch.load(pretrained_model_path, map_location="cpu"))
 		self.pretrained_model = pretrained_model
 		self.unfreezing_type = config.unfreezing_type
 		self.unfreezing_index = config.starting_unfreezing_index
@@ -435,7 +439,6 @@ class Model(torch.nn.Module):
 
 		self.intent_layers = torch.nn.ModuleList(self.intent_layers)
 
-		self.is_cuda = torch.cuda.is_available()
 		if self.is_cuda:
 			self.cuda()
 
