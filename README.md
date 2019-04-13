@@ -7,7 +7,7 @@ If you have any questions about this code or have problems getting it to work, p
 ## Dependencies
 PyTorch, numpy, soundfile, pandas, tqdm, textgrid.py
 
-## Usage
+## Training
 First, change the ```asr_path``` and/or ```slu_path``` in the config file (like ```experiments/no_unfreezing.cfg```, or whichever experiment you want to run) to point to where the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
 
 _SLU training:_ To train the model on Fluent Speech Commands, run the following command:
@@ -20,6 +20,24 @@ _ASR pre-training:_ **Note:** the experiment folders in this repo already have a
 python main.py --pretrain --config_path=<path to .cfg>
 ```
 
+## Inference
+You can perform inference with a trained SLU model as follows (thanks, Nathan Folkman!):
+```
+import data
+import models
+import soundfile as sf
+import torch
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+config = data.read_config("experiments/no_unfreezing.cfg"); _,_,_=data.get_SLU_datasets(config)
+model = models.Model(config)
+model.load_state_dict(torch.load("experiments/no_unfreezing/training/model_state.pth", map_location=device)) # load trained model
+
+signal, _ = sf.read("test.wav")
+signal = torch.tensor(signal, device=device).float().unsqueeze(0)
+
+model.decode_intents(signal)
+```
 
 ## Citation
 If you find this repo or our Fluent Speech Commands dataset useful, please cite our paper:
