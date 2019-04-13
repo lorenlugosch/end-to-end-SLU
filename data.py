@@ -120,6 +120,7 @@ def get_SLU_datasets(config):
 			Sy_intent[slot][value] = idx
 		values_per_slot.append(len(slot_values))
 	config.values_per_slot = values_per_slot
+	config.Sy_intent = Sy_intent
 
 	# If certain phrases are specified, only use those phrases
 	if config.train_wording_path is not None:
