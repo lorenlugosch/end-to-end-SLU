@@ -22,7 +22,7 @@ python main.py --pretrain --config_path=<path to .cfg>
 
 ## Inference
 You can perform inference with a trained SLU model as follows (thanks, Nathan Folkman!):
-```
+```python
 import data
 import models
 import soundfile as sf
