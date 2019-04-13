@@ -383,6 +383,7 @@ class Model(torch.nn.Module):
 	def __init__(self, config):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
+		self.Sy_intent = config.Sy_intent
 		pretrained_model = PretrainedModel(config)
 		if config.pretraining_type != 0:
 			pretrained_model_path = os.path.join(config.folder, "pretraining", "model_state.pth")
@@ -545,3 +546,15 @@ class Model(torch.nn.Module):
 		predicted_intent = torch.stack(predicted_intent, dim=1)
 
 		return intent_logits, predicted_intent
+
+	def decode_intents(self, x):
+		_, predicted_intent = self.predict_intents(x)
+		intents = []
+		for prediction in predicted_intent:
+			intent = []
+			for idx, slot in enumerate(self.Sy_intent):
+				for value in self.Sy_intent[slot]:
+					if prediction[idx].item() == self.Sy_intent[slot][value]:
+						intent.append(value)
+			intents.append(intent)
+		return intents
