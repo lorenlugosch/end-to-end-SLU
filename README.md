@@ -38,6 +38,7 @@ signal = torch.tensor(signal, device=device).float().unsqueeze(0)
 
 model.decode_intents(signal)
 ```
+The ```test.wav``` file included with this repo has a recording of me saying "Hey computer, could you turn the lights on in the kitchen please?", and so the inferred intent should be ```{"activate", "lights", "kitchen"}```.
 
 ## Citation
 If you find this repo or our Fluent Speech Commands dataset useful, please cite our paper:
