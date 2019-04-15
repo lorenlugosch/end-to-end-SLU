@@ -2,6 +2,8 @@
 This repo contains the code for the paper "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)".
 Our paper introduces the [Fluent Speech Commands](http://www.fluent.ai/research/fluent-speech-commands/) dataset and explores useful pre-training strategies for end-to-end spoken language understanding.
 
+I'm going to keep messing around with this code; if you want a version that is guaranteed to give you the results in the paper, use [this commit](https://github.com/lorenlugosch/pretrain_speech_model/tree/2213a122718cbbc9bd8b6762f9c87c9cef0b04d3).
+
 If you have any questions about this code or have problems getting it to work, please send me an email at ```<the email address listed for Loren in the paper>```.
 
 ## Dependencies
