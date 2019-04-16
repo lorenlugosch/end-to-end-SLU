@@ -220,7 +220,7 @@ class SLUDataset(torch.utils.data.Dataset):
 				right_padding = length-(x.shape[0]-start)
 				x = np.pad(x,(left_padding, right_padding),mode="constant")
 			else:
-				start += np.random.randint(low=-start, high=0, size=1)[0]
+				start += np.random.randint(low=-start, high=1, size=1)[0]
 				x = x[start:start+length]
 
 			# noise (taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py)
