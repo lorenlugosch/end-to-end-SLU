@@ -1,4 +1,5 @@
 import torch
+import torchaudio
 import torch.utils.data
 import os, glob
 from collections import Counter
@@ -154,14 +155,14 @@ def get_SLU_datasets(config):
 		train_df = train_df.set_index(np.arange(len(train_df)))
 
 	# Create dataset objects
-	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
+	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config, augment=True)
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 
 	return train_dataset, valid_dataset, test_dataset
 
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config):
+	def __init__(self, df, base_path, Sy_intent, config, augment=False):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -169,25 +170,48 @@ class SLUDataset(torch.utils.data.Dataset):
 		"""
 		self.df = df
 		self.base_path = base_path
-		self.max_length = 200000 # truncate audios longer than this
+		# self.max_length = 200000 # truncate audios longer than this
 		self.Sy_intent = Sy_intent
+		self.augment = augment
 		
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
 
 	def __len__(self):
-		return len(self.df)
+		if self.augment: return len(self.df)*2 # second half of dataset is augmented
+		else: return len(self.df)
 
 	def __getitem__(self, idx):
+		augment = ((idx / len(self.df)) > 1) and self.augment
+		idx = idx % len(self.df)
+
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
-		x, fs = sf.read(wav_path)
+		effect = torchaudio.sox_effects.SoxEffectsChain()
+		effect.set_input_file(wav_path)
 
-		if len(x) <= self.max_length:
-			start = 0
-		else:
-			start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
-		end = start + self.max_length
+		if augment:
+			# speed/tempo
+			min_speed = 0.9; max_speed = 1.1; speed_range = max_speed-min_speed
+			speed = speed_range * np.random.rand(1)[0] + min_speed
+			effect.append_effect_to_chain("tempo", speed)
 
-		x = x[start:end]
+			# volume
+			min_gain = -10; max_gain = 10; gain_range = max_gain-min_gain
+			gain_dB = gain_range * np.random.rand(1)[0] + min_gain
+			gain = 10**(gain_dB/20)
+			effect.append_effect_to_chain("vol", gain)
+
+			# noise
+			## TODO
+
+		x, fs = effect.sox_build_flow_effects()
+		x = x[0].numpy()
+
+		if augment:
+			# crop
+			min_length = round(x.shape[0]*0.9); max_length = round(x.shape[0]*1.1); length_range=max_length-min_length
+			length = length_range * np.random.rand(1)[0] + min_length
+			## TODO
+
 		y_intent = [] 
 		for slot in ["action", "object", "location"]:
 			value = self.df.loc[idx][slot]
