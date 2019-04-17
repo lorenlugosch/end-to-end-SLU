@@ -186,6 +186,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		augment = ((idx / len(self.df)) > 1) and self.augment
+		true_idx = idx
 		idx = idx % len(self.df)
 
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
@@ -204,15 +205,16 @@ class SLUDataset(torch.utils.data.Dataset):
 			gain = 10**(gain_dB/20)
 			effect.append_effect_to_chain("vol", gain)
 
-		x, fs = effect.sox_build_flow_effects()
-		x = x[0].numpy()
+		wav, fs = effect.sox_build_flow_effects()
+		x = wav[0].numpy()
+		del wav, effect
 
 		y_intent = [] 
 		for slot in ["action", "object", "location"]:
 			value = self.df.loc[idx][slot]
 			y_intent.append(self.Sy_intent[slot][value])
 
-		return (x, y_intent)
+		return (x, y_intent, true_idx)
 
 class CollateWavsSLU:
 	def __init__(self, augment=False):
@@ -231,8 +233,9 @@ class CollateWavsSLU:
 		batch_size = len(batch)
 
 		for index in range(batch_size):
-			x_,y_intent_ = batch[index]
+			x_,y_intent_,index_ = batch[index]
 
+			# augment = self.augment and index_
 			# if augment:
 			# 	# crop
 			# 	min_length = round(x_.shape[0]*0.9); max_length = round(x_.shape[0]*1.1); length_range=max_length-min_length
