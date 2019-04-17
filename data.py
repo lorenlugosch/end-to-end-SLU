@@ -177,8 +177,9 @@ class SLUDataset(torch.utils.data.Dataset):
 		# self.max_length = 200000 # truncate audios longer than this
 		self.Sy_intent = Sy_intent
 		self.augment = augment
+		len_df = len(self.df)
 
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(augment=augment))
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(augment=augment, len_df=len_df))
 
 	def __len__(self):
 		if self.augment: return len(self.df)*2 # second half of dataset is augmented
@@ -195,15 +196,17 @@ class SLUDataset(torch.utils.data.Dataset):
 
 		if augment:
 			# speed/tempo
-			min_speed = 0.9; max_speed = 1.1; speed_range = max_speed-min_speed
-			speed = speed_range * np.random.rand(1)[0] + min_speed
-			effect.append_effect_to_chain("tempo", speed)
+			#min_speed = 0.9; max_speed = 1.1; speed_range = max_speed-min_speed
+			#speed = speed_range * np.random.rand(1)[0] + min_speed
+			#effect.append_effect_to_chain("tempo", speed)
+			#del speed
 
 			# volume
 			min_gain = -10; max_gain = 10; gain_range = max_gain-min_gain
 			gain_dB = gain_range * np.random.rand(1)[0] + min_gain
 			gain = 10**(gain_dB/20)
 			effect.append_effect_to_chain("vol", gain)
+			del gain_dB
 
 		wav, fs = effect.sox_build_flow_effects()
 		x = wav[0].numpy()
@@ -217,8 +220,9 @@ class SLUDataset(torch.utils.data.Dataset):
 		return (x, y_intent, true_idx)
 
 class CollateWavsSLU:
-	def __init__(self, augment=False):
+	def __init__(self, augment=False, len_df=len_df):
 		self.augment = augment
+		self.len_df=len_df
 		noise_paths = glob.glob("noise/*.wav")
 		self.noises = [sf.read(path)[0] for path in noise_paths]
 		self.SNRs = [0,5,10,15,20]
@@ -235,7 +239,7 @@ class CollateWavsSLU:
 		for index in range(batch_size):
 			x_,y_intent_,index_ = batch[index]
 
-			# augment = self.augment and index_
+			# augment = self.augment and (index_ / self.len_df) > 1
 			# if augment:
 			# 	# crop
 			# 	min_length = round(x_.shape[0]*0.9); max_length = round(x_.shape[0]*1.1); length_range=max_length-min_length
