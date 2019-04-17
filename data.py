@@ -220,7 +220,7 @@ class SLUDataset(torch.utils.data.Dataset):
 		return (x, y_intent, true_idx)
 
 class CollateWavsSLU:
-	def __init__(self, augment=False, len_df=len_df):
+	def __init__(self, augment=False, len_df=0):
 		self.augment = augment
 		self.len_df=len_df
 		noise_paths = glob.glob("noise/*.wav")
