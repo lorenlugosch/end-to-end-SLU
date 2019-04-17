@@ -222,6 +222,7 @@ class SLUDataset(torch.utils.data.Dataset):
 			else:
 				start += np.random.randint(low=-start, high=1, size=1)[0]
 				x = x[start:start+length]
+			length = x.shape[0]
 
 			# noise (taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py)
 			noise = np.random.choice(self.noises, 1, p=[1/len(self.noises) for _ in range(len(self.noises))])[0]
