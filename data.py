@@ -1,5 +1,5 @@
 import torch
-import torchaudio
+import torchaudio; torchaudio.initialize_sox()
 import torch.utils.data
 import os, glob
 from collections import Counter
@@ -180,8 +180,7 @@ class SLUDataset(torch.utils.data.Dataset):
 		noise_paths = glob.glob("noise/*.wav")
 		self.noises = [sf.read(path)[0] for path in noise_paths]
 		self.SNRs = [0,5,10,15,20]
-		torchaudio.initialize_sox()
-		
+
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
 
 	def __len__(self):
