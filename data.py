@@ -239,32 +239,32 @@ class CollateWavsSLU:
 		for index in range(batch_size):
 			x_,y_intent_,index_ = batch[index]
 
-			augment = self.augment and (index_ / self.len_df) > 1
-			if augment:
-				# crop
-				min_length = round(x_.shape[0]*0.9); max_length = round(x_.shape[0]*1.1); length_range=max_length-min_length
-				length = int(length_range * np.random.rand(1)[0] + min_length)
-				start = int((x_.shape[0]-length)/2)
-				if start < 0:
-					left_padding = -start
-					right_padding = length-(x_.shape[0]-start)
-					x_ = np.pad(x_,(left_padding, right_padding),mode="constant")
-				else:
-					start += np.random.randint(low=-start, high=1, size=1)[0]
-					x_ = x_[start:start+length]
-				length = x_.shape[0]
+			# augment = self.augment and (index_ / self.len_df) > 1
+			# if augment:
+			# 	# crop
+			# 	min_length = round(x_.shape[0]*0.9); max_length = round(x_.shape[0]*1.1); length_range=max_length-min_length
+			# 	length = int(length_range * np.random.rand(1)[0] + min_length)
+			# 	start = int((x_.shape[0]-length)/2)
+			# 	if start < 0:
+			# 		left_padding = -start
+			# 		right_padding = length-(x_.shape[0]-start)
+			# 		x_ = np.pad(x_,(left_padding, right_padding),mode="constant")
+			# 	else:
+			# 		start += np.random.randint(low=-start, high=1, size=1)[0]
+			# 		x_ = x_[start:start+length]
+			# 	length = x_.shape[0]
 
-				# noise (taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py)
-				noise = np.random.choice(self.noises, 1, p=[1/len(self.noises) for _ in range(len(self.noises))])[0]
-				snr = np.random.choice(self.SNRs, 1, p=[1/len(self.SNRs) for _ in range(len(self.SNRs))])[0]
-				start = np.random.randint(low=0, high=len(noise)-length, size=1)[0]
-				end = start + length
-				noise = noise[start:end]
-				N_dB = rms_energy(noise)
-				S_dB = rms_energy(x_)
-				N_new = S_dB - snr
-				noise_scaled = 10**(N_new/20) * noise / 10**(N_dB/20)
-				x_ = x_ + noise_scaled
+			# 	# noise (taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py)
+			# 	noise = np.random.choice(self.noises, 1, p=[1/len(self.noises) for _ in range(len(self.noises))])[0]
+			# 	snr = np.random.choice(self.SNRs, 1, p=[1/len(self.SNRs) for _ in range(len(self.SNRs))])[0]
+			# 	start = np.random.randint(low=0, high=len(noise)-length, size=1)[0]
+			# 	end = start + length
+			# 	noise = noise[start:end]
+			# 	N_dB = rms_energy(noise)
+			# 	S_dB = rms_energy(x_)
+			# 	N_new = S_dB - snr
+			# 	noise_scaled = 10**(N_new/20) * noise / 10**(N_dB/20)
+			# 	x_ = x_ + noise_scaled
 
 			x.append(torch.tensor(x_).float())
 			y_intent.append(torch.tensor(y_intent_).long())
