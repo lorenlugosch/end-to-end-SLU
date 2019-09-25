@@ -82,7 +82,10 @@ def read_config(config_file):
 	config.training_lr=float(parser.get("training", "training_lr"))
 	config.training_batch_size=int(parser.get("training", "training_batch_size"))
 	config.training_num_epochs=int(parser.get("training", "training_num_epochs"))
-	config.dataset_subset_percentage=float(parser.get("training", "dataset_subset_percentage"))
+	config.real_dataset_subset_percentage=float(parser.get("training", "real_dataset_subset_percentage"))
+	config.synthetic_dataset_subset_percentage=float(parser.get("training", "synthetic_dataset_subset_percentage"))
+	config.real_speaker_subset_percentage=float(parser.get("training", "real_speaker_subset_percentage"))
+	config.synthetic_speaker_subset_percentage=float(parser.get("training", "synthetic_speaker_subset_percentage"))
 	config.train_wording_path=parser.get("training", "train_wording_path")
 	if config.train_wording_path=="None": config.train_wording_path = None
 	config.test_wording_path=parser.get("training", "test_wording_path")
@@ -106,7 +109,34 @@ def get_SLU_datasets(config):
 	base_path = config.slu_path
 
 	# Split
-	train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv"))
+	synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
+	real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv")).drop(columns="Unnamed: 0")
+
+	# Select random subset of speakers
+	if config.real_speaker_subset_percentage < 1:
+		speakers = np.array(list(Counter(real_train_df.speakerId)))
+		np.random.shuffle(speakers)
+		selected_speaker_count = round(config.real_speaker_subset_percentage * len(speakers))
+		selected_speakers = speakers[:selected_speaker_count]
+		real_train_df = real_train_df[real_train_df["speakerId"].isin(selected_speakers)]
+	if config.synthetic_speaker_subset_percentage < 1:
+		speakers = np.array(list(Counter(synthetic_train_df.speakerId)))
+		np.random.shuffle(speakers)
+		selected_speaker_count = round(config.synthetic_speaker_subset_percentage * len(speakers))
+		selected_speakers = speakers[:selected_speaker_count]
+		synthetic_train_df = synthetic_train_df[synthetic_train_df["speakerId"].isin(selected_speakers)]
+
+	# Select random subset of training data
+	if config.real_dataset_subset_percentage < 1:
+		subset_size = round(config.real_dataset_subset_percentage * len(real_train_df))
+		real_train_df = real_train_df.loc[np.random.choice(len(real_train_df), subset_size, replace=False)]
+		#real_train_df = real_train_df.set_index(np.arange(len(real_train_df)))
+	if config.synthetic_dataset_subset_percentage < 1:
+		subset_size = round(config.synthetic_dataset_subset_percentage * len(synthetic_train_df))
+		synthetic_train_df = synthetic_train_df.loc[np.random.choice(len(synthetic_train_df), subset_size, replace=False)]
+		#synthetic_train_df = synthetic_train_df.set_index(np.arange(len(synthetic_train_df)))
+
+	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
 	valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data.csv"))
 	test_df = pd.read_csv(os.path.join(base_path, "data", "test_data.csv"))
 	
@@ -146,12 +176,6 @@ def get_SLU_datasets(config):
 		config.num_phonemes = len(Sy_phoneme)
 	else:
 		print("No phoneme file found.")
-
-	# Select random subset of training data
-	if config.dataset_subset_percentage < 1:
-		subset_size = round(config.dataset_subset_percentage * len(train_df))
-		train_df = train_df.loc[np.random.choice(len(train_df), subset_size, replace=False)]
-		train_df = train_df.set_index(np.arange(len(train_df)))
 
 	# Create dataset objects
 	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
