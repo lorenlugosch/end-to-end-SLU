@@ -374,7 +374,168 @@ def is_frozen(layer):
 		if param.requires_grad: return False
 	return True
 
+class Seq2SeqEncoder(torch.nn.Module):
+        def __init__(self, input_dim, num_layers, encoder_dim):
+                super(Model, self).__init__()
+		out_dim = input_dim
+		self.layers = []
+		for idx in range(num_layers):
+			# recurrent
+			layer = torch.nn.GRU(input_size=out_dim, hidden_size=encoder_dim, batch_first=True, bidirectional=True)
+			layer.name = "intent_encoder_rnn%d" % idx
+			self.layers.append(layer)
+		
+			out_dim = encoder_dim
+			out_dim *= 2 # bidirectional
 
+			# grab hidden states of RNN for each timestep
+			layer = RNNSelect()
+			layer.name = "intent_encoder_rnn_select%d" % idx
+			self.layers.append(layer)
+
+			# dropout
+			layer = torch.nn.Dropout(p=0.5)
+			layer.name = "intent_encoder_dropout%d" % idx
+			self.layers.append(layer)
+
+		self.layers = torch.nn.ModuleList(self.layers)
+
+	def forward(self, x):
+		for layer in self.layers:
+			out = layer(out)
+		return out
+
+class Attention(torch.nn.Module):
+	def __init__(self, encoder_dim, decoder_dim, key_dim, value_dim):
+		super(Attention, self).__init__()
+		self.scale_factor = torch.sqrt(torch.tensor(key_dim).float())
+		self.key_linear = torch.nn.Linear(encoder_dim, key_dim)
+		self.query_linear = torch.nn.Linear(decoder_dim, key_dim)
+		self.value_linear = torch.nn.Linear(encoder_dim, value_dim)
+		self.softmax = torch.nn.Softmax(dim=1)
+
+	def forward(self, encoder_states, decoder_state):
+		"""
+		encoder_states: Tensor of shape (batch size, T, encoder_dim)
+		decoder_state: Tensor of shape (batch size, decoder_dim)
+
+		Map the input sequence to a summary vector (batch size, value_dim) using attention, given a query.
+		"""
+		keys = self.key_linear(encoder_states)
+		values = self.value_linear(encoder_states)
+		query = self.query_linear(decoder_state)
+		query = query.unsqueeze(2)
+		scores = torch.matmul(keys, query) / self.scale_factor
+		normalized_scores = self.softmax(scores).transpose(1,2)
+		out = torch.matmul(normalized_scores, values).squeeze(1)
+		return out
+
+class DecoderRNN(torch.nn.Module):
+	def __init__(self, num_decoder_layers, num_decoder_hidden, input_size, dropout):
+		super(DecoderRNN, self).__init__()
+		# self.gru = torch.nn.GRUCell(input_size=input_size, hidden_size=num_decoder_hidden)
+		# self.dropout = torch.nn.Dropout(dropout)
+
+		self.layers = []
+		self.num_layers = num_decoder_layers
+		for index in range(num_decoder_layers):
+			if index == 0: 
+				layer = torch.nn.GRUCell(input_size=input_size, hidden_size=num_decoder_hidden) 
+			else:
+				layer = torch.nn.GRUCell(input_size=num_decoder_hidden, hidden_size=num_decoder_hidden) 
+			layer.name = "gru%d"%index
+			self.layers.append(layer)
+
+			layer = torch.nn.Dropout(p=dropout)
+			layer.name = "dropout%d"%index
+			self.layers.append(layer)
+		self.layers = torch.nn.ModuleList(self.layers)
+
+	def forward(self, input, previous_state):
+		"""
+		input: Tensor of shape (batch size, input_size)
+		previous_state: Tensor of shape (batch size, num_decoder_layers, num_decoder_hidden)
+
+		Given the input vector, update the hidden state of each decoder layer.
+		"""
+		# return self.gru(input, previous_state)
+
+		state = []
+		batch_size = input.shape[0]
+		gru_index = 0
+		for index, layer in enumerate(self.layers):
+			if index == 0:
+				layer_out = layer(input, previous_state[:, gru_index])
+				state.append(layer_out)
+				gru_index += 1
+			else:
+				if "gru" in layer.name:
+					layer_out = layer(layer_out, previous_state[:, gru_index])
+					state.append(layer_out)
+					gru_index += 1
+				else: 
+					layer_out = layer(layer_out)
+		state = torch.stack(state, dim=1)
+		return state 
+
+class Seq2SeqDecoder(torch.nn.Module):
+	"""
+	Attention-based decoder for seq2seq SLU
+	"""
+	def __init__(self, num_labels, num_layers, encoder_dim, decoder_dim, key_dim, value_dim, SOS):
+                super(Model, self).__init__()
+		embedding_dim = decoder_dim
+		self.embed = torch.nn.Linear(num_labels, embedding_dim)
+		self.attention = Attention(encoder_dim*2, decoder_dim, key_dim, value_dim)
+		self.rnn = DecoderRNN(num_layers, decoder_dim, embedding_dim, dropout=0.5)
+		self.initial_state = torch.nn.Parameter(torch.randn(num_decoder_layers,num_decoder_hidden))
+		self.linear = torch.nn.Linear(decoder_dim, num_labels)
+		self.log_softmax = torch.nn.LogSoftmax(dim=1)
+		self.SOS = SOS
+
+	def forward(self, encoder_outputs, y, y_lengths):
+		"""
+		encoder_outputs : Tensor of shape (batch size, T, encoder output dim)
+		y : Tensor of shape (batch size, U, num_labels) - padded with end-of-sequence tokens
+		y_lengths : list of integers
+		Compute log p(y|x) for each (x,y) in the batch.
+		"""
+		#if self.is_cuda:
+		#	x = x.cuda()
+		#	y = y.cuda()
+
+		batch_size = y.shape[0]
+		U = y.shape[1]
+		num_labels = y.shape[2]
+
+		# Initialize the decoder state
+		decoder_state = torch.stack([self.initial_state] * batch_size)
+
+		# Initialize log p(y|x) to 0, y_u-1 to SOS
+		log_p_y_x = 0
+		y_u_1 = torch.zeros(batch_size, num_labels)
+		y_u_1[:,self.SOS] = 1.
+		if self.is_cuda: y_u_1 = y_u_1.cuda()
+		for u in range(0, U):
+			# Feed in the previous element of y and the attention output; update the decoder state
+			context = self.attention(encoder_outputs, decoder_state[:,-1])
+			decoder_input = torch.cat([y_u_1, context], dim=1)
+			decoder_state = self.rnn(decoder_input, decoder_state)
+
+			# Compute log p(y_u|y_1, y_2, ..., x) (the log probability of the next element)
+			decoder_out = self.log_softmax(self.linear(decoder_state[:,-1]))
+			log_p_yu = (decoder_out * y[:,u,:]).sum(dim=1) # y_u is one-hot; use dot-product to select the y_u'th output probability 
+
+			# Add log p(y_u|...) to log p(y|x)
+			log_p_y_x += log_p_yu
+
+			# Look at next element of y
+			y_u_1 = y[:,u,:]
+
+		return log_probs
+
+	def infer(self, x):
+		return 0
 
 class Model(torch.nn.Module):
 	"""
@@ -395,50 +556,60 @@ class Model(torch.nn.Module):
 		self.unfreezing_type = config.unfreezing_type
 		self.unfreezing_index = config.starting_unfreezing_index
 		self.intent_layers = []
-		self.values_per_slot = config.values_per_slot
-		self.num_values_total = sum(self.values_per_slot)
 		if config.pretraining_type != 0:
 			self.freeze_all_layers()
-
-		# intent RNN
-		num_rnn_layers = len(config.intent_rnn_num_hidden)
+		self.seq2seq = config.seq2seq
 		out_dim = config.word_rnn_num_hidden[-1]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
-		for idx in range(num_rnn_layers):
-			# recurrent
-			layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
-			layer.name = "intent_rnn%d" % idx
-			self.intent_layers.append(layer)
+
+		# fixed-length output:
+		if not self.seq2seq:
+			self.values_per_slot = config.values_per_slot
+			self.num_values_total = sum(self.values_per_slot)
+			num_rnn_layers = len(config.intent_rnn_num_hidden)
+			for idx in range(num_rnn_layers):
+				# recurrent
+				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
+				layer.name = "intent_rnn%d" % idx
+				self.intent_layers.append(layer)
 		
-			out_dim = config.intent_rnn_num_hidden[idx]
-			if config.intent_rnn_bidirectional:
-				out_dim *= 2
+				out_dim = config.intent_rnn_num_hidden[idx]
+				if config.intent_rnn_bidirectional:
+					out_dim *= 2
 
-			# grab hidden states of RNN for each timestep
-			layer = RNNSelect()
-			layer.name = "intent_rnn_select%d" % idx
+				# grab hidden states of RNN for each timestep
+				layer = RNNSelect()
+				layer.name = "intent_rnn_select%d" % idx
+				self.intent_layers.append(layer)
+
+				# dropout
+				layer = torch.nn.Dropout(p=config.intent_rnn_drop[idx])
+				layer.name = "intent_dropout%d" % idx
+				self.intent_layers.append(layer)
+
+				# downsample
+				layer = Downsample(method=config.intent_downsample_type[idx], factor=config.intent_downsample_len[idx], axis=1)
+				layer.name = "intent_downsample%d" % idx
+				self.intent_layers.append(layer)
+
+			layer = torch.nn.Linear(out_dim, self.num_values_total)
+			layer.name = "final_classifier"
 			self.intent_layers.append(layer)
 
-			# dropout
-			layer = torch.nn.Dropout(p=config.intent_rnn_drop[idx])
-			layer.name = "intent_dropout%d" % idx
+			layer = FinalPool()
+			layer.name = "final_pool"
 			self.intent_layers.append(layer)
 
-			# downsample
-			layer = Downsample(method=config.intent_downsample_type[idx], factor=config.intent_downsample_len[idx], axis=1)
-			layer.name = "intent_downsample%d" % idx
-			self.intent_layers.append(layer)
+			self.intent_layers = torch.nn.ModuleList(self.intent_layers)
 
-		layer = torch.nn.Linear(out_dim, self.num_values_total)
-		layer.name = "final_classifier"
-		self.intent_layers.append(layer)
-
-		layer = FinalPool()
-		layer.name = "final_pool"
-		self.intent_layers.append(layer)
-
-		self.intent_layers = torch.nn.ModuleList(self.intent_layers)
+		# seq2seq
+		else:
+			self.SOS = config.SOS
+			self.EOS = config.EOS
+			self.num_labels = len(config.Sy_intent) + 2 # for SOS and EOS 
+			self.encoder = Seq2SeqEncoder(out_dim, config.num_intent_encoder_layers, config.intent_encoder_dim)
+			self.decoder = Seq2SeqDecoder(self.num_labels, config.num_intent_decoder_layers, config.intent_encoder_dim, config.intent_decoder_dim, config.intent_decoder_key_dim, config.intent_decoder_value_dim, self.SOS)
 
 		if self.is_cuda:
 			self.cuda()
@@ -511,41 +682,52 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
 
-		for layer in self.intent_layers:
-			out = layer(out)
-		intent_logits = out # shape: (batch size, num_values_total)
+		if not self.seq2seq:
+			for layer in self.intent_layers:
+				out = layer(out)
+			intent_logits = out # shape: (batch size, num_values_total)
 
-		intent_loss = 0.
-		start_idx = 0
-		predicted_intent = []
-		for slot in range(len(self.values_per_slot)):
-			end_idx = start_idx + self.values_per_slot[slot]
-			subset = intent_logits[:, start_idx:end_idx]
-			intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
-			predicted_intent.append(subset.max(1)[1])
-			start_idx = end_idx
-		predicted_intent = torch.stack(predicted_intent, dim=1)
-		intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
+			intent_loss = 0.
+			start_idx = 0
+			predicted_intent = []
+			for slot in range(len(self.values_per_slot)):
+				end_idx = start_idx + self.values_per_slot[slot]
+				subset = intent_logits[:, start_idx:end_idx]
+				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
+				predicted_intent.append(subset.max(1)[1])
+				start_idx = end_idx
+			predicted_intent = torch.stack(predicted_intent, dim=1)
+			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
-		return intent_loss, intent_acc
+			return intent_loss, intent_acc
+
+		else: # seq2seq
+			out = self.encoder(out)
+			log_probs = self.decoder(out, y_intent)
+			return log_probs.mean(), 0.
 
 	def predict_intents(self, x):
 		out = self.pretrained_model.compute_features(x)
 
-		for layer in self.intent_layers:
-			out = layer(out)
-		intent_logits = out # shape: (batch size, num_values_total)
+		if not self.seq2seq:
+			for layer in self.intent_layers:
+				out = layer(out)
+			intent_logits = out # shape: (batch size, num_values_total)
+			start_idx = 0
+			predicted_intent = []
+			for slot in range(len(self.values_per_slot)):
+				end_idx = start_idx + self.values_per_slot[slot]
+				subset = intent_logits[:, start_idx:end_idx]
+				predicted_intent.append(subset.max(1)[1])
+				start_idx = end_idx
+			predicted_intent = torch.stack(predicted_intent, dim=1)
 
-		start_idx = 0
-		predicted_intent = []
-		for slot in range(len(self.values_per_slot)):
-			end_idx = start_idx + self.values_per_slot[slot]
-			subset = intent_logits[:, start_idx:end_idx]
-			predicted_intent.append(subset.max(1)[1])
-			start_idx = end_idx
-		predicted_intent = torch.stack(predicted_intent, dim=1)
+			return intent_logits, predicted_intent
 
-		return intent_logits, predicted_intent
+		else: #seq2seq
+			out = self.encoder(out)
+			beam_scores, beam = self.decoder.infer(out)
+			return beam_scores, beam
 
 	def decode_intents(self, x):
 		_, predicted_intent = self.predict_intents(x)
