@@ -1,5 +1,6 @@
 import torch
 import torch.utils.data
+import torchaudio
 import os, glob
 from collections import Counter
 import soundfile as sf
@@ -90,6 +91,17 @@ def read_config(config_file):
 	if config.train_wording_path=="None": config.train_wording_path = None
 	config.test_wording_path=parser.get("training", "test_wording_path")
 	if config.test_wording_path=="None": config.test_wording_path = None
+	try:
+		config.augment = (parser.get("training", "augment")  == "True")
+	except:
+		# old config file with no augmentation
+		config.augment = False
+
+	try:
+		config.seq2seq = (parser.get("training", "seq2seq")  == "True")
+	except:
+		# old config file with no seq2seq
+		config.seq2seq = False
 
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1
@@ -178,14 +190,18 @@ def get_SLU_datasets(config):
 		print("No phoneme file found.")
 
 	# Create dataset objects
-	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config)
+	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config, augment=config.augment)
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 
 	return train_dataset, valid_dataset, test_dataset
 
+# taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py
+def rms_energy(x):
+	return 10*np.log10((1e-12 + x.dot(x))/len(x))
+
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config):
+	def __init__(self, df, base_path, Sy_intent, config, augment=False):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -193,25 +209,66 @@ class SLUDataset(torch.utils.data.Dataset):
 		"""
 		self.df = df
 		self.base_path = base_path
-		self.max_length = 200000 # truncate audios longer than this
 		self.Sy_intent = Sy_intent
-		
+		self.augment = augment
+		self.SNRs = [0,5,10,15,20]
+
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
 
 	def __len__(self):
+		if self.augment: return len(self.df)*2 # second half of dataset is augmented
 		return len(self.df)
 
 	def __getitem__(self, idx):
+		augment = ((idx / len(self.df)) > 1) and self.augment
+		true_idx = idx
+		idx = idx % len(self.df)
+
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
-		x, fs = sf.read(wav_path)
+		effect = torchaudio.sox_effects.SoxEffectsChain()
+		effect.set_input_file(wav_path)
 
-		if len(x) <= self.max_length:
-			start = 0
-		else:
-			start = torch.randint(low=0, high=len(x)-self.max_length, size=(1,)).item()
-		end = start + self.max_length
+		if augment:
+			# speed/tempo
+			min_speed = 0.9; max_speed = 1.1; speed_range = max_speed-min_speed
+			speed = speed_range * np.random.rand(1)[0] + min_speed
+			effect.append_effect_to_chain("tempo", speed)
+			del speed
 
-		x = x[start:end]
+			# volume
+			min_gain = -10; max_gain = 10; gain_range = max_gain-min_gain
+			gain_dB = gain_range * np.random.rand(1)[0] + min_gain
+			gain = 10**(gain_dB/20)
+			effect.append_effect_to_chain("vol", gain)
+			del gain_dB
+
+
+		wav, fs = effect.sox_build_flow_effects()
+		x = wav[0].numpy()
+		del wav, effect
+
+		if augment:
+			# crop
+			min_length = round(x.shape[0]*0.9); max_length = round(x.shape[0]*1.1); length_range=max_length-min_length
+			length = int(length_range * np.random.rand(1)[0] + min_length)
+			start = int((x.shape[0]-length)/2)
+			if start < 0:
+				left_padding = -start
+				right_padding = length-(x.shape[0]-start)
+				x = np.pad(x,(left_padding, right_padding),mode="constant")
+			else:
+				start += np.random.randint(low=-start, high=1, size=1)[0]
+				x = x[start:start+length]
+
+			# noise (taken from https://github.com/jfsantos/maracas/blob/master/maracas/maracas.py)
+			snr = np.random.choice(self.SNRs, 1, p=[1/len(self.SNRs) for _ in range(len(self.SNRs))])[0]
+			noise = np.random.randn(len(x))
+			N_dB = rms_energy(noise)
+			S_dB = rms_energy(x)
+			N_new = S_dB - snr
+			noise_scaled = 10**(N_new/20) * noise / 10**(N_dB/20)
+			x = x + noise_scaled
+
 		y_intent = [] 
 		for slot in ["action", "object", "location"]:
 			value = self.df.loc[idx][slot]
