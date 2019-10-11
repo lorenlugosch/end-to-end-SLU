@@ -375,8 +375,8 @@ def is_frozen(layer):
 	return True
 
 class Seq2SeqEncoder(torch.nn.Module):
-        def __init__(self, input_dim, num_layers, encoder_dim):
-                super(Model, self).__init__()
+	def __init__(self, input_dim, num_layers, encoder_dim):
+		super(Seq2SeqEncoder, self).__init__()
 		out_dim = input_dim
 		self.layers = []
 		for idx in range(num_layers):
@@ -401,6 +401,7 @@ class Seq2SeqEncoder(torch.nn.Module):
 		self.layers = torch.nn.ModuleList(self.layers)
 
 	def forward(self, x):
+		out = x
 		for layer in self.layers:
 			out = layer(out)
 		return out
@@ -478,22 +479,36 @@ class DecoderRNN(torch.nn.Module):
 		state = torch.stack(state, dim=1)
 		return state 
 
+def sort_beam(beam_extensions, beam_extension_scores, beam_pointers):
+	beam_width = len(beam_pointers); batch_size = beam_pointers[0].shape[0]
+	beam_extensions = torch.stack(beam_extensions); beam_extension_scores = torch.stack(beam_extension_scores); beam_pointers = torch.stack(beam_pointers)
+	beam_extension_scores = beam_extension_scores.view(beam_width,batch_size)
+
+	sort_order = beam_extension_scores.sort(dim=0, descending=True)[1].reshape(beam_width, batch_size)
+	sorted_beam_extensions = beam_extensions.clone(); sorted_beam_extension_scores = beam_extension_scores.clone(); sorted_beam_pointers = beam_pointers.clone()
+	
+	for batch_index in range(batch_size):
+		sorted_beam_extensions[:, batch_index] = beam_extensions[sort_order[:,batch_index], batch_index]
+		sorted_beam_extension_scores[:, batch_index] = beam_extension_scores[sort_order[:,batch_index], batch_index]
+		sorted_beam_pointers[:, batch_index] = beam_pointers[sort_order[:,batch_index], batch_index]
+	return sorted_beam_extensions, sorted_beam_extension_scores, sorted_beam_pointers
+
 class Seq2SeqDecoder(torch.nn.Module):
 	"""
 	Attention-based decoder for seq2seq SLU
 	"""
-	def __init__(self, num_labels, num_layers, encoder_dim, decoder_dim, key_dim, value_dim, SOS):
-                super(Model, self).__init__()
+	def __init__(self, num_labels, num_layers, encoder_dim, decoder_dim, key_dim, value_dim, SOS=0):
+		super(Seq2SeqDecoder, self).__init__()
 		embedding_dim = decoder_dim
 		self.embed = torch.nn.Linear(num_labels, embedding_dim)
 		self.attention = Attention(encoder_dim*2, decoder_dim, key_dim, value_dim)
-		self.rnn = DecoderRNN(num_layers, decoder_dim, embedding_dim, dropout=0.5)
-		self.initial_state = torch.nn.Parameter(torch.randn(num_decoder_layers,num_decoder_hidden))
+		self.rnn = DecoderRNN(num_layers, decoder_dim, embedding_dim + value_dim, dropout=0.5)
+		self.initial_state = torch.nn.Parameter(torch.randn(num_layers,decoder_dim))
 		self.linear = torch.nn.Linear(decoder_dim, num_labels)
 		self.log_softmax = torch.nn.LogSoftmax(dim=1)
-		self.SOS = SOS
+		self.SOS = SOS # index of SOS label
 
-	def forward(self, encoder_outputs, y, y_lengths):
+	def forward(self, encoder_outputs, y, y_lengths=None):
 		"""
 		encoder_outputs : Tensor of shape (batch size, T, encoder output dim)
 		y : Tensor of shape (batch size, U, num_labels) - padded with end-of-sequence tokens
@@ -503,6 +518,7 @@ class Seq2SeqDecoder(torch.nn.Module):
 		#if self.is_cuda:
 		#	x = x.cuda()
 		#	y = y.cuda()
+		self.is_cuda = next(self.parameters()).is_cuda
 
 		batch_size = y.shape[0]
 		U = y.shape[1]
@@ -519,7 +535,8 @@ class Seq2SeqDecoder(torch.nn.Module):
 		for u in range(0, U):
 			# Feed in the previous element of y and the attention output; update the decoder state
 			context = self.attention(encoder_outputs, decoder_state[:,-1])
-			decoder_input = torch.cat([y_u_1, context], dim=1)
+			embedding = self.embed(y_u_1)
+			decoder_input = torch.cat([embedding, context], dim=1)
 			decoder_state = self.rnn(decoder_input, decoder_state)
 
 			# Compute log p(y_u|y_1, y_2, ..., x) (the log probability of the next element)
@@ -527,15 +544,107 @@ class Seq2SeqDecoder(torch.nn.Module):
 			log_p_yu = (decoder_out * y[:,u,:]).sum(dim=1) # y_u is one-hot; use dot-product to select the y_u'th output probability 
 
 			# Add log p(y_u|...) to log p(y|x)
-			log_p_y_x += log_p_yu
+			log_p_y_x += log_p_yu # TODO: mask based on y_lengths?
 
 			# Look at next element of y
 			y_u_1 = y[:,u,:]
 
-		return log_probs
+		return log_p_y_x
 
-	def infer(self, x):
-		return 0
+	def infer(self, encoder_outputs, Sy, B=4, debug=False, y_lengths=None):
+		"""
+		encoder_outputs : Tensor of shape (batch size, T, encoder_dim*2)
+		Sy : list of characters (output alphabet)
+		B : integer (beam width)
+		debug : boolean (print debugging statements during search)
+		Run beam search to find y_hat = argmax_y log p(y|x) for every (x) in the batch.
+		(If B = 1, this is equivalent to greedy search.)
+		"""
+		#if self.is_cuda: x = x.cuda()
+		self.is_cuda = next(self.parameters()).is_cuda
+
+		batch_size = encoder_outputs.shape[0]
+		Sy_size = len(Sy)
+
+		# Initialize the decoder state
+		decoder_state = torch.stack([self.initial_state] * batch_size)
+
+		true_U = 100
+
+		if y_lengths is not None:
+			true_U = max(y_lengths)
+
+		decoder_state_shape = decoder_state.shape
+		beam = torch.zeros(B,batch_size,true_U,Sy_size); beam_scores = torch.zeros(B,batch_size); decoder_states = torch.zeros(B,decoder_state_shape[0], decoder_state_shape[1], decoder_state_shape[2])
+		if self.is_cuda:
+			beam = beam.cuda()
+			beam_scores = beam_scores.cuda()
+			decoder_states = decoder_states.cuda()
+
+		for u in range(true_U):
+			beam_extensions = []; beam_extension_scores = []; beam_pointers = []
+
+			# Add a delay so that it's easier to read the outputs during debugging
+			if debug and u < true_U:
+				time.sleep(1)
+				print("")
+
+			for b in range(B):
+				# Get previous guess
+				if u == 0: 
+					beam_score = beam_scores[b]
+					y_hat_u_1 = torch.zeros(batch_size, Sy_size)
+					if self.is_cuda:
+						beam_score = beam_score.cuda()
+						y_hat_u_1 = y_hat_u_1.cuda()
+				else: 
+					# Select hypothesis (and corresponding decoder state/score) from beam
+					y_hat = beam[b]
+					decoder_state = decoder_states[b]
+					beam_score = beam_scores[b]
+					y_hat_u_1 = y_hat[:,u-1,:]
+
+					# If in debug mode, print out the current beam
+					if debug and u < true_U: print(self.one_hot_to_string(y_hat[0,:u], Sy).strip("\n") + " | score: %1.2f" % beam_score[0].item())
+
+				# Feed in the previous guess; update the decoder state
+				context = self.attention(encoder_outputs, decoder_state[:,-1])
+				embedding = self.embed(y_hat_u_1)
+				decoder_input = torch.cat([embedding, context], dim=1)
+				decoder_state = self.rnn(decoder_input, decoder_state)
+				decoder_states[b] = decoder_state.clone()
+
+				# Compute log p(y_u|y_1, y_2, ..., x) (the log probability of the next element)
+				decoder_out = self.log_softmax(self.linear(decoder_state[:,-1]))
+
+				# Find the top B possible extensions for each of the B hypotheses
+				top_B_extension_scores, top_B_extensions = decoder_out.topk(B)
+				top_B_extension_scores = top_B_extension_scores.transpose(0,1); top_B_extensions = top_B_extensions.transpose(0,1)
+				for extension_index in range(B):
+					extension = torch.zeros(batch_size, Sy_size)
+					extension_score = top_B_extension_scores[extension_index] + beam_score
+					extension[torch.arange(batch_size), top_B_extensions[extension_index]] = 1.
+					beam_extensions.append(extension.clone())
+					beam_extension_scores.append(extension_score.clone())
+					beam_pointers.append(torch.ones(batch_size).long() * b) # we need to remember which hypothesis this extension belongs to
+
+				# At the first decoding timestep, there are no other hypotheses to extend.
+				if u == 0: break
+
+			# Sort the B^2 extensions
+			beam_extensions, beam_extension_scores, beam_pointers = sort_beam(beam_extensions, beam_extension_scores, beam_pointers)
+			old_beam = beam.clone(); old_beam_scores = beam_scores.clone(); old_decoder_states = decoder_states.clone()
+			beam *= 0; beam_scores *= 0; decoder_states *= 0;
+
+			# Pick the top B extended hypotheses
+			for b in range(len(beam_extensions[:B])):
+				for batch_index in range(batch_size):
+					beam[b,batch_index] = old_beam[beam_pointers[b, batch_index],batch_index]
+					beam[b,batch_index,u,:] = beam_extensions[b, batch_index] # append the extensions to each hypothesis
+					beam_scores[b, batch_index] = beam_extension_scores[b, batch_index] # update the beam scores
+					decoder_states[b, batch_index] = old_decoder_states[beam_pointers[b, batch_index],batch_index]
+
+		return beam_scores, beam
 
 class Model(torch.nn.Module):
 	"""
@@ -605,14 +714,22 @@ class Model(torch.nn.Module):
 
 		# seq2seq
 		else:
-			self.SOS = config.SOS
-			self.EOS = config.EOS
-			self.num_labels = len(config.Sy_intent) + 2 # for SOS and EOS 
+			self.SOS = config.Sy_intent.index("<sos>")
+			#self.EOS = config.EOS
+			self.num_labels = len(config.Sy_intent) 
 			self.encoder = Seq2SeqEncoder(out_dim, config.num_intent_encoder_layers, config.intent_encoder_dim)
 			self.decoder = Seq2SeqDecoder(self.num_labels, config.num_intent_decoder_layers, config.intent_encoder_dim, config.intent_decoder_dim, config.intent_decoder_key_dim, config.intent_decoder_value_dim, self.SOS)
 
 		if self.is_cuda:
 			self.cuda()
+
+	def one_hot_to_string(self, input, S):
+		"""
+		input : Tensor of shape (T, |S|)
+		S : list of characters/tokens
+		"""
+
+		return "".join([S[c] for c in input.max(dim=1)[1]]).lstrip("<sos>").rstrip("<eos>")
 
 	def freeze_all_layers(self):
 		for layer in self.pretrained_model.phoneme_layers:
@@ -704,7 +821,7 @@ class Model(torch.nn.Module):
 		else: # seq2seq
 			out = self.encoder(out)
 			log_probs = self.decoder(out, y_intent)
-			return log_probs.mean(), 0.
+			return -log_probs.mean(), torch.tensor([0.])
 
 	def predict_intents(self, x):
 		out = self.pretrained_model.compute_features(x)
@@ -726,17 +843,29 @@ class Model(torch.nn.Module):
 
 		else: #seq2seq
 			out = self.encoder(out)
-			beam_scores, beam = self.decoder.infer(out)
+			beam_scores, beam = self.decoder.infer(out, self.Sy_intent, B=4)
 			return beam_scores, beam
 
 	def decode_intents(self, x):
 		_, predicted_intent = self.predict_intents(x)
-		intents = []
-		for prediction in predicted_intent:
-			intent = []
-			for idx, slot in enumerate(self.Sy_intent):
-				for value in self.Sy_intent[slot]:
-					if prediction[idx].item() == self.Sy_intent[slot][value]:
-						intent.append(value)
-			intents.append(intent)
-		return intents
+
+		if not self.seq2seq:
+			intents = []
+			for prediction in predicted_intent:
+				intent = []
+				for idx, slot in enumerate(self.Sy_intent):
+					for value in self.Sy_intent[slot]:
+						if prediction[idx].item() == self.Sy_intent[slot][value]:
+							intent.append(value)
+				intents.append(intent)
+			return intents
+
+		else: # seq2seq
+			intents = []
+			#predicted_intent: (beam, batch, U, num_labels)
+			batch_size = predicted_intent.shape[1]
+			for i in range(0, batch_size): 
+				intent = self.one_hot_to_string(predicted_intent[0,i],self.Sy_intent)
+				intents.append(intent)
+			return intents
+

@@ -63,6 +63,15 @@ def read_config(config_file):
 	config.intent_downsample_type=[x for x in parser.get("intent_module", "intent_downsample_type").split(",")]
 	config.intent_rnn_drop=[float(x) for x in parser.get("intent_module", "intent_rnn_drop").split(",")]
 	config.intent_rnn_bidirectional=(parser.get("intent_module", "intent_rnn_bidirectional") == "True")
+	try:
+		config.intent_encoder_dim=int(parser.get("intent_module", "intent_encoder_dim"))
+		config.num_intent_encoder_layers=int(parser.get("intent_module", "num_intent_encoder_layers"))
+		config.intent_decoder_dim=int(parser.get("intent_module", "intent_decoder_dim"))
+		config.num_intent_decoder_layers=int(parser.get("intent_module", "num_intent_decoder_layers"))
+		config.intent_decoder_key_dim=int(parser.get("intent_module", "intent_decoder_key_dim"))
+		config.intent_decoder_value_dim=int(parser.get("intent_module", "intent_decoder_value_dim"))
+	except:
+		print("no seq2seq hyperparameters")
 
 	#[pretraining]
 	config.asr_path=parser.get("pretraining", "asr_path")
@@ -121,8 +130,12 @@ def get_SLU_datasets(config):
 	base_path = config.slu_path
 
 	# Split
-	synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
-	real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv")).drop(columns="Unnamed: 0")
+	if not config.seq2seq:
+		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
+		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv")).drop(columns="Unnamed: 0")
+	else:
+		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data_seq2seq.csv"))
+		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data_seq2seq.csv")).drop(columns="Unnamed: 0")
 
 	# Select random subset of speakers
 	if config.real_speaker_subset_percentage < 1:
@@ -149,20 +162,33 @@ def get_SLU_datasets(config):
 		#synthetic_train_df = synthetic_train_df.set_index(np.arange(len(synthetic_train_df)))
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
-	valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data.csv"))
-	test_df = pd.read_csv(os.path.join(base_path, "data", "test_data.csv"))
-	
-	# Get list of slots
-	Sy_intent = {"action": {}, "object": {}, "location": {}}
+	if not config.seq2seq:
+		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data.csv"))
+		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data.csv"))
+	else:
+		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
+		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data_seq2seq.csv"))
 
-	values_per_slot = []
-	for slot in ["action", "object", "location"]:
-		slot_values = Counter(train_df[slot])
-		for idx,value in enumerate(slot_values):
-			Sy_intent[slot][value] = idx
-		values_per_slot.append(len(slot_values))
-	config.values_per_slot = values_per_slot
-	config.Sy_intent = Sy_intent
+	if not config.seq2seq:
+		# Get list of slots
+		Sy_intent = {"action": {}, "object": {}, "location": {}}
+
+		values_per_slot = []
+		for slot in ["action", "object", "location"]:
+			slot_values = Counter(train_df[slot])
+			for idx,value in enumerate(slot_values):
+				Sy_intent[slot][value] = idx
+			values_per_slot.append(len(slot_values))
+		config.values_per_slot = values_per_slot
+		config.Sy_intent = Sy_intent
+	else: #seq2seq
+		import string
+		all_chars = "".join(train_df.loc[i]["semantics"] for i in range(len(train_df))) + string.printable # all printable chars; TODO: unicode?
+		all_chars = list(set(all_chars))
+		Sy_intent = ["<sos>"]
+		Sy_intent += all_chars
+		Sy_intent.append("<eos>")
+		config.Sy_intent = Sy_intent
 
 	# If certain phrases are specified, only use those phrases
 	if config.train_wording_path is not None:
@@ -212,8 +238,9 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.Sy_intent = Sy_intent
 		self.augment = augment
 		self.SNRs = [0,5,10,15,20]
+		self.seq2seq = config.seq2seq
 
-		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU())
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 
 	def __len__(self):
 		if self.augment: return len(self.df)*2 # second half of dataset is augmented
@@ -269,14 +296,40 @@ class SLUDataset(torch.utils.data.Dataset):
 			noise_scaled = 10**(N_new/20) * noise / 10**(N_dB/20)
 			x = x + noise_scaled
 
-		y_intent = [] 
-		for slot in ["action", "object", "location"]:
-			value = self.df.loc[idx][slot]
-			y_intent.append(self.Sy_intent[slot][value])
+		if not self.seq2seq:
+			y_intent = [] 
+			for slot in ["action", "object", "location"]:
+				value = self.df.loc[idx][slot]
+				y_intent.append(self.Sy_intent[slot][value])
+		else:
+			# need sos, eos
+			y_intent = [self.Sy_intent.index("<sos>")]
+			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
+			y_intent.append(self.Sy_intent.index("<eos>"))
 
 		return (x, y_intent)
 
+def one_hot(letters, S):
+	"""
+	letters : LongTensor of shape (batch size, sequence length)
+	S : integer
+	Convert batch of integer letter indices to one-hot vectors of dimension S (# of possible letters).
+	"""
+
+	out = torch.zeros(letters.shape[0], letters.shape[1], S)
+	for i in range(0, letters.shape[0]):
+		for t in range(0, letters.shape[1]):
+			out[i, t, letters[i,t]] = 1
+	return out
+
 class CollateWavsSLU:
+	def __init__(self, Sy_intent, seq2seq):
+		self.Sy_intent = Sy_intent
+		self.num_labels = len(self.Sy_intent)
+		self.seq2seq = seq2seq
+		if self.seq2seq:
+			self.EOS = self.Sy_intent.index("<eos>")
+
 	def __call__(self, batch):
 		"""
 		batch: list of tuples (input wav, intent labels)
@@ -292,15 +345,31 @@ class CollateWavsSLU:
 			y_intent.append(torch.tensor(y_intent_).long())
 
 		# pad all sequences to have same length
-		T = max([len(x_) for x_ in x])
-		for index in range(batch_size):
-			x_pad_length = (T - len(x[index]))
-			x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+		if not self.seq2seq:
+			T = max([len(x_) for x_ in x])
+			for index in range(batch_size):
+				x_pad_length = (T - len(x[index]))
+				x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
 
-		x = torch.stack(x)
-		y_intent = torch.stack(y_intent)
+			x = torch.stack(x)
+			y_intent = torch.stack(y_intent)
 
-		return (x,y_intent)
+			return (x,y_intent)
+
+		else: # seq2seq
+			T = max([len(x_) for x_ in x])
+			U = max([len(y_intent_) for y_intent_ in y_intent])
+			for index in range(batch_size):
+				x_pad_length = (T - len(x[index]))
+				x[index] = torch.nn.functional.pad(x[index], (0,x_pad_length))
+				y_pad_length = (U - len(y_intent[index]))
+				y_intent[index] = torch.nn.functional.pad(y_intent[index], (0,y_pad_length), value=self.EOS)
+
+			x = torch.stack(x)
+			y_intent = torch.stack(y_intent)
+			y_intent = one_hot(y_intent, self.num_labels)
+
+			return (x,y_intent)
 
 def get_ASR_datasets(config):
 	"""

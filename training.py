@@ -100,6 +100,12 @@ class Trainer:
 				if idx % print_interval == 0:
 					print("intent loss: " + str(intent_loss.cpu().data.numpy().item()))
 					print("intent acc: " + str(intent_acc.cpu().data.numpy().item()))
+					if self.model.seq2seq:
+						print("seq2seq output")
+						self.model.eval()
+						print("guess: " + self.model.decode_intents(x)[0])
+						print("truth: " + self.model.one_hot_to_string(y_intent[0],self.model.Sy_intent))
+						self.model.train()
 			train_intent_loss /= num_examples
 			train_intent_acc /= num_examples
 			self.model.unfreeze_one_layer()
