@@ -75,6 +75,7 @@ class SincLayer(torch.nn.Module):
 		self.is_cuda = is_cuda
 
 	def forward(self, x):
+		self.is_cuda = next(self.parameters()).is_cuda
 		filters=torch.zeros((self.N_filt,self.Filt_dim)) #.cuda()
 		if self.is_cuda: filters = filters.cuda()
 		N=self.Filt_dim
@@ -295,6 +296,7 @@ class PretrainedModel(torch.nn.Module):
 
 		Compute loss for y_word and y_phoneme for each x in the batch.
 		"""
+		self.is_cuda = next(self.parameters()).is_cuda
 		if self.is_cuda:
 			x = x.cuda()
 			y_phoneme = y_phoneme.cuda()
@@ -329,6 +331,7 @@ class PretrainedModel(torch.nn.Module):
 		return phoneme_loss, word_loss, phoneme_acc, word_acc
 
 	def compute_posteriors(self, x):
+		self.is_cuda = next(self.parameters()).is_cuda
 		if self.is_cuda:
 			x = x.cuda()
 
@@ -344,6 +347,7 @@ class PretrainedModel(torch.nn.Module):
 		return phoneme_logits, word_logits
 
 	def compute_features(self, x):
+		self.is_cuda = next(self.parameters()).is_cuda
 		if self.is_cuda:
 			x = x.cuda()
 
