@@ -138,18 +138,25 @@ def get_SLU_datasets(config):
 		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data_seq2seq.csv")).drop(columns="Unnamed: 0")
 
 	# Select random subset of speakers
-	if config.real_speaker_subset_percentage < 1:
-		speakers = np.array(list(Counter(real_train_df.speakerId)))
-		np.random.shuffle(speakers)
-		selected_speaker_count = round(config.real_speaker_subset_percentage * len(speakers))
-		selected_speakers = speakers[:selected_speaker_count]
-		real_train_df = real_train_df[real_train_df["speakerId"].isin(selected_speakers)]
-	if config.synthetic_speaker_subset_percentage < 1:
-		speakers = np.array(list(Counter(synthetic_train_df.speakerId)))
-		np.random.shuffle(speakers)
-		selected_speaker_count = round(config.synthetic_speaker_subset_percentage * len(speakers))
-		selected_speakers = speakers[:selected_speaker_count]
-		synthetic_train_df = synthetic_train_df[synthetic_train_df["speakerId"].isin(selected_speakers)]
+	# First, check if "speakerId" is in the df columns
+	if "speakerId" in list(real_train_df):
+		if config.real_speaker_subset_percentage < 1:
+			speakers = np.array(list(Counter(real_train_df.speakerId)))
+			np.random.shuffle(speakers)
+			selected_speaker_count = round(config.real_speaker_subset_percentage * len(speakers))
+			selected_speakers = speakers[:selected_speaker_count]
+			real_train_df = real_train_df[real_train_df["speakerId"].isin(selected_speakers)]
+		if config.synthetic_speaker_subset_percentage < 1:
+			speakers = np.array(list(Counter(synthetic_train_df.speakerId)))
+			np.random.shuffle(speakers)
+			selected_speaker_count = round(config.synthetic_speaker_subset_percentage * len(speakers))
+			selected_speakers = speakers[:selected_speaker_count]
+			synthetic_train_df = synthetic_train_df[synthetic_train_df["speakerId"].isin(selected_speakers)]
+	else:
+		if config.real_speaker_subset_percentage < 1:
+			print("no speaker id listed in dataset .csv; ignoring speaker subset selection")
+		if config.synthetic_speaker_subset_percentage < 1:
+			print("no speaker id listed in dataset .csv; ignoring speaker subset selection")
 
 	# Select random subset of training data
 	if config.real_dataset_subset_percentage < 1:

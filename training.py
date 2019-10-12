@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from tqdm import tqdm # for displaying progress bar
 import os
@@ -150,6 +151,14 @@ class Trainer:
 				intent_loss, intent_acc = self.model(x,y_intent)
 				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
+				if self.model.seq2seq and self.epoch > 1:
+					print("decoding batch %d" % idx)
+					guess_strings = np.array(self.model.decode_intents(x))
+					truth_strings = np.array([self.model.one_hot_to_string(y_intent[i],self.model.Sy_intent) for i in range(batch_size)])
+					test_intent_acc += (guess_strings == truth_strings).mean() * batch_size
+					print("acc: " + str((guess_strings == truth_strings).mean()))
+					print("guess: " + guess_strings[0])
+					print("truth: " + truth_strings[0])
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
