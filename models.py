@@ -573,7 +573,7 @@ class Seq2SeqDecoder(torch.nn.Module):
 		# Initialize the decoder state
 		decoder_state = torch.stack([self.initial_state] * batch_size)
 
-		true_U = 100
+		true_U = 200
 
 		if y_lengths is not None:
 			true_U = max(y_lengths)
