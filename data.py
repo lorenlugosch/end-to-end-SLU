@@ -112,6 +112,12 @@ def read_config(config_file):
 		# old config file with no seq2seq
 		config.seq2seq = False
 
+	try:
+		config.dataset_upsample_factor = int(parser.get("training", "dataset_upsample_factor"))
+	except:
+		# old config file
+		config.dataset_upsample_factor = 1
+
 	# compute downsample factor (divide T by this number)
 	config.phone_downsample_factor = 1
 	for factor in config.cnn_stride + config.cnn_max_pool_len + config.phone_downsample_len:
@@ -132,14 +138,16 @@ def get_SLU_datasets(config):
 	# Split
 	if not config.seq2seq:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
-		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv")).drop(columns="Unnamed: 0")
+		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv"))
+		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
 	else:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data_seq2seq.csv"))
-		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data_seq2seq.csv")).drop(columns="Unnamed: 0")
+		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data_seq2seq.csv"))
+		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
 
 	# Select random subset of speakers
 	# First, check if "speakerId" is in the df columns
-	if "speakerId" in list(real_train_df):
+	if "speakerId" in list(real_train_df) and "speakerId" in list(synthetic_train_df):
 		if config.real_speaker_subset_percentage < 1:
 			speakers = np.array(list(Counter(real_train_df.speakerId)))
 			np.random.shuffle(speakers)
@@ -153,6 +161,8 @@ def get_SLU_datasets(config):
 			selected_speakers = speakers[:selected_speaker_count]
 			synthetic_train_df = synthetic_train_df[synthetic_train_df["speakerId"].isin(selected_speakers)]
 	else:
+		if "speakerId" in list(real_train_df): real_train_df = real_train_df.drop(columns="speakerId")
+		if "speakerId" in list(synthetic_train_df): synthetic_train_df = synthetic_train_df.drop(columns="speakerId")
 		if config.real_speaker_subset_percentage < 1:
 			print("no speaker id listed in dataset .csv; ignoring speaker subset selection")
 		if config.synthetic_speaker_subset_percentage < 1:
@@ -223,7 +233,7 @@ def get_SLU_datasets(config):
 		print("No phoneme file found.")
 
 	# Create dataset objects
-	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config, augment=config.augment)
+	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 
@@ -234,7 +244,7 @@ def rms_energy(x):
 	return 10*np.log10((1e-12 + x.dot(x))/len(x))
 
 class SLUDataset(torch.utils.data.Dataset):
-	def __init__(self, df, base_path, Sy_intent, config, augment=False):
+	def __init__(self, df, base_path, Sy_intent, config, upsample_factor=1):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
@@ -243,25 +253,27 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.df = df
 		self.base_path = base_path
 		self.Sy_intent = Sy_intent
-		self.augment = augment
+		self.upsample_factor = upsample_factor
+		self.augment = False #augment
 		self.SNRs = [0,5,10,15,20]
 		self.seq2seq = config.seq2seq
 
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 
 	def __len__(self):
-		if self.augment: return len(self.df)*2 # second half of dataset is augmented
-		return len(self.df)
+		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
+		return len(self.df) * self.upsample_factor
 
 	def __getitem__(self, idx):
-		augment = ((idx / len(self.df)) > 1) and self.augment
-		true_idx = idx
+		#augment = ((idx / len(self.df)) > 1) and self.augment
+		#true_idx = idx
 		idx = idx % len(self.df)
 
 		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
 		effect = torchaudio.sox_effects.SoxEffectsChain()
 		effect.set_input_file(wav_path)
 
+		augment = False
 		if augment:
 			# speed/tempo
 			min_speed = 0.9; max_speed = 1.1; speed_range = max_speed-min_speed
