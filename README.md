@@ -1,11 +1,10 @@
-# Speech Model Pre-training for End-to-End Spoken Language Understanding
-This repo contains the code for the paper "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)".
-Our paper introduces the [Fluent Speech Commands](http://www.fluent.ai/research/fluent-speech-commands/) dataset and explores useful pre-training strategies for end-to-end spoken language understanding.
+# End-to-End Spoken Language Understanding (SLU) in PyTorch
+This repo contains Pytorch code for training end-to-end SLU models used in the papers "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)" and "Using Speech Synthesis to Train End-to-End Spoken Language Understanding Models".
 
 If you have any questions about this code or have problems getting it to work, please send me an email at ```<the email address listed for Loren in the paper>```.
 
 ## Dependencies
-PyTorch, numpy, soundfile, pandas, tqdm, textgrid.py
+PyTorch, torchaudio, numpy, soundfile, pandas, tqdm, textgrid.py
 
 ## Training
 First, change the ```asr_path``` and/or ```slu_path``` in the config file (like ```experiments/no_unfreezing.cfg```, or whichever experiment you want to run) to point to where the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
@@ -41,6 +40,7 @@ model.decode_intents(signal)
 The ```test.wav``` file included with this repo has a recording of me saying "Hey computer, could you turn the lights on in the kitchen please?", and so the inferred intent should be ```{"activate", "lights", "kitchen"}```.
 
 ## Citation
-If you find this repo or our Fluent Speech Commands dataset useful, please cite our paper:
+If you find this repo or our Fluent Speech Commands dataset useful, please cite our papers:
 
 - Loren Lugosch, Mirco Ravanelli, Patrick Ignoto, Vikrant Singh Tomar, and Yoshua Bengio, "Speech Model Pre-training for End-to-End Spoken Language Understanding", Interspeech, 2019.
+- Loren Lugosch, Brett Meyer, Derek Nowrouzezahrai, and Mirco Ravanelli, "Using Speech Synthesis to Train End-to-End Spoken Language Understanding Models", arXiv, 2019.
