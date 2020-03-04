@@ -9,7 +9,7 @@ PyTorch, torchaudio, numpy, soundfile, pandas, tqdm, textgrid.py
 ## Training
 First, change the ```asr_path``` and/or ```slu_path``` in the config file (like ```experiments/no_unfreezing.cfg```, or whichever experiment you want to run) to point to where the LibriSpeech data and/or Fluent Speech Commands data are stored on your computer.
 
-_SLU training:_ To train the model on Fluent Speech Commands, run the following command:
+_SLU training:_ To train the model on an SLU dataset, run the following command:
 ```
 python main.py --train --config_path=<path to .cfg>
 ```
