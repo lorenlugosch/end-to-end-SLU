@@ -326,7 +326,7 @@ class SLUDataset(torch.utils.data.Dataset):
 			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
 			y_intent.append(self.Sy_intent.index("<eos>"))
 
-		return (x, y_intent)
+		return (x, self.df.loc[idx].path, y_intent)
 
 def one_hot(letters, S):
 	"""
@@ -355,13 +355,14 @@ class CollateWavsSLU:
 
 		Returns a minibatch of wavs and labels as Tensors.
 		"""
-		x = []; y_intent = []
+		x = []; x_paths=[]; y_intent = []
 		batch_size = len(batch)
 		for index in range(batch_size):
-			x_,y_intent_ = batch[index]
+			x_, x_path, y_intent_ = batch[index]
 
 			x.append(torch.tensor(x_).float())
 			y_intent.append(torch.tensor(y_intent_).long())
+			x_paths.append(x_path)
 
 		# pad all sequences to have same length
 		if not self.seq2seq:
@@ -373,7 +374,7 @@ class CollateWavsSLU:
 			x = torch.stack(x)
 			y_intent = torch.stack(y_intent)
 
-			return (x,y_intent)
+			return (x,x_paths,y_intent)
 
 		else: # seq2seq
 			T = max([len(x_) for x_ in x])
@@ -388,7 +389,7 @@ class CollateWavsSLU:
 			y_intent = torch.stack(y_intent)
 			y_intent = one_hot(y_intent, self.num_labels)
 
-			return (x,y_intent)
+			return (x,x_paths,y_intent)
 
 def get_ASR_datasets(config):
 	"""

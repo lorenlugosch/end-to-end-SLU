@@ -88,7 +88,7 @@ class Trainer:
 			self.model.train()
 			self.model.print_frozen()
 			for idx, batch in enumerate(tqdm(dataset.loader)):
-				x,y_intent = batch
+				x,_,y_intent = batch
 				batch_size = len(x)
 				num_examples += batch_size
 				intent_loss, intent_acc = self.model(x,y_intent)
@@ -149,7 +149,7 @@ class Trainer:
 			self.model.eval()
 			self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
 			for idx, batch in enumerate(dataset.loader):
-				x,y_intent = batch
+				x,x_path, y_intent = batch
 				batch_size = len(x)
 				num_examples += batch_size
 				intent_loss, intent_acc = self.model(x,y_intent)
@@ -168,4 +168,72 @@ class Trainer:
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
 			self.log(results)
+			return test_intent_acc, test_intent_loss 
+
+	def get_error(self, dataset, error_path=None):
+		if isinstance(dataset, ASRDataset):
+			test_phone_acc = 0
+			test_phone_loss = 0
+			test_word_acc = 0
+			test_word_loss = 0
+			num_examples = 0
+			self.model.eval()
+			for idx, batch in enumerate(dataset.loader):
+				x,y_phoneme,y_word = batch
+				batch_size = len(x)
+				num_examples += batch_size
+				phoneme_loss, word_loss, phoneme_acc, word_acc = self.model(x,y_phoneme,y_word)
+				test_phone_loss += phoneme_loss.cpu().data.numpy().item() * batch_size
+				test_word_loss += word_loss.cpu().data.numpy().item() * batch_size
+				test_phone_acc += phoneme_acc.cpu().data.numpy().item() * batch_size
+				test_word_acc += word_acc.cpu().data.numpy().item() * batch_size
+			test_phone_loss /= num_examples
+			test_phone_acc /= num_examples
+			test_word_loss /= num_examples
+			test_word_acc /= num_examples
+			results = {"phone_loss" : test_phone_loss, "phone_acc" : test_phone_acc, "word_loss" : test_word_loss, "word_acc" : test_word_acc,"set": "valid"}
+			self.log(results)
+			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
+		else:
+			complete_path_filter=[]
+			complete_pred=[]
+			complete_y=[]
+			test_intent_acc = 0
+			test_intent_loss = 0
+			num_examples = 0
+			self.model.eval()
+			self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
+			for idx, batch in enumerate(dataset.loader):
+				x,x_path, y_intent = batch
+				batch_size = len(x)
+				num_examples += batch_size
+				predicted_intent,y_intent,intent_loss, intent_acc = self.model.test(x,y_intent)
+				test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
+				test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
+				if self.model.seq2seq and self.epoch > 1:
+					print("decoding batch %d" % idx)
+					guess_strings = np.array(self.model.decode_intents(x))
+					truth_strings = np.array([self.model.one_hot_to_string(y_intent[i],self.model.Sy_intent) for i in range(batch_size)])
+					test_intent_acc += (guess_strings == truth_strings).mean() * batch_size
+					print("acc: " + str((guess_strings == truth_strings).mean()))
+					print("guess: " + guess_strings[0])
+					print("truth: " + truth_strings[0])
+
+				# Note(Sid, Vijay, Alissa):
+				# This evaluation should always match end-to-end-SLU/models.py:821.
+				match=(1 - (predicted_intent==y_intent).prod(1)).cpu().numpy()
+				match = np.array(match, dtype=bool)
+				x_path = np.array(x_path)
+				complete_path_filter.extend(x_path[match])
+				complete_pred.extend(predicted_intent[match].cpu().numpy())
+				complete_y.extend(y_intent[match].cpu().numpy())
+
+			self.model.cuda(); self.model.is_cuda = True
+			test_intent_loss /= num_examples
+			test_intent_acc /= num_examples
+			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
+			self.log(results)
+			df=pd.DataFrame({'audio path': complete_path_filter,'prediction': complete_pred,'correct label': complete_y})
+			if error_path is not None:
+				df.to_csv(error_path,index=False)
 			return test_intent_acc, test_intent_loss 

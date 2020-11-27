@@ -827,6 +827,40 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
+	def test(self, x, y_intent):
+		"""
+		x : Tensor of shape (batch size, T)
+		y_intent : LongTensor of shape (batch size, num_slots)
+		"""
+		if self.is_cuda:
+			y_intent = y_intent.cuda()
+		out = self.pretrained_model.compute_features(x)
+
+		if not self.seq2seq:
+			for layer in self.intent_layers:
+				out = layer(out)
+			intent_logits = out # shape: (batch size, num_values_total)
+
+			intent_loss = 0.
+			start_idx = 0
+			predicted_intent = []
+			for slot in range(len(self.values_per_slot)):
+				end_idx = start_idx + self.values_per_slot[slot]
+				subset = intent_logits[:, start_idx:end_idx]
+				intent_loss += torch.nn.functional.cross_entropy(subset, y_intent[:, slot])
+				predicted_intent.append(subset.max(1)[1])
+				start_idx = end_idx
+			predicted_intent = torch.stack(predicted_intent, dim=1)
+			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
+
+			return predicted_intent,y_intent,intent_loss, intent_acc
+
+		else: # seq2seq
+			out = self.encoder(out)
+			log_probs = self.decoder(out, y_intent)
+			return -log_probs.mean(), torch.tensor([0.])
+
+
 	def predict_intents(self, x):
 		out = self.pretrained_model.compute_features(x)
 
