@@ -11,8 +11,6 @@ parser.add_argument('--restart', action='store_true', help='load checkpoint from
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 # parser.add_argument('--error_ana_path', type=str, help='path to config file with hyperparameters, etc.')
 args = parser.parse_args()
-pretrain = args.pretrain
-train = args.train
 restart = args.restart
 config_path = args.config_path
 
@@ -33,4 +31,4 @@ if restart: trainer.load_checkpoint()
 
 test_intent_acc, test_intent_loss = trainer.get_error(test_dataset)
 print("========= Test results =========")
-print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )

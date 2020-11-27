@@ -218,14 +218,21 @@ class Trainer:
 					print("acc: " + str((guess_strings == truth_strings).mean()))
 					print("guess: " + guess_strings[0])
 					print("truth: " + truth_strings[0])
-				complete_path_filter.extend(x_path[(predicted_intent!=y_intent).cpu().numpy()])
-				complete_pred.extend(predicted_intent[(predicted_intent!=y_intent).cpu().numpy()])
-				complete_y.extend(y_intent[(predicted_intent!=y_intent).cpu().numpy()])
+
+				# Note(Sid, Vijay, Alissa):
+				# This evaluation should always match end-to-end-SLU/models.py:821.
+				match=(1 - (predicted_intent==y_intent).prod(1)).cpu().numpy()
+				match = np.array(match, dtype=bool)
+				x_path = np.array(x_path)
+				complete_path_filter.extend(x_path[match])
+				complete_pred.extend(predicted_intent[match].cpu().numpy())
+				complete_y.extend(y_intent[match].cpu().numpy())
+
 			self.model.cuda(); self.model.is_cuda = True
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
 			self.log(results)
 			df=pd.DataFrame({'audio path': complete_path_filter,'prediction': complete_pred,'correct label': complete_y})
-			pd.write_csv(path="error_analysis.csv",index=False)
+			df.to_csv("error_analysis.csv",index=False)
 			return test_intent_acc, test_intent_loss 
