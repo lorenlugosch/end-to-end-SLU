@@ -170,7 +170,7 @@ class Trainer:
 			self.log(results)
 			return test_intent_acc, test_intent_loss 
 
-	def get_error(self, dataset):
+	def get_error(self, dataset, error_path=None):
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
@@ -234,5 +234,6 @@ class Trainer:
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
 			self.log(results)
 			df=pd.DataFrame({'audio path': complete_path_filter,'prediction': complete_pred,'correct label': complete_y})
-			df.to_csv("error_analysis.csv",index=False)
+			if error_path is not None:
+				df.to_csv(error_path,index=False)
 			return test_intent_acc, test_intent_loss 
