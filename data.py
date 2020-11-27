@@ -326,7 +326,7 @@ class SLUDataset(torch.utils.data.Dataset):
 			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
 			y_intent.append(self.Sy_intent.index("<eos>"))
 
-		return (x, y_intent)
+		return (x, self.df.loc[idx].path, y_intent)
 
 def one_hot(letters, S):
 	"""
