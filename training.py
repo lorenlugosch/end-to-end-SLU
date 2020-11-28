@@ -145,9 +145,32 @@ class Trainer:
 			batch_size = len(x)
 			num_examples += batch_size
 			x_words = self.model.get_words(x)
-			print(x_words)
-			break
-		return 
+			intent_loss, intent_acc = self.model.run_pipeline(x_words,y_intent)
+			loss = intent_loss
+			self.optimizer.zero_grad()
+			loss.backward()
+			self.optimizer.step()
+			train_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
+			train_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
+			if idx % print_interval == 0:
+				print("intent loss: " + str(intent_loss.cpu().data.numpy().item()))
+				print("intent acc: " + str(intent_acc.cpu().data.numpy().item()))
+				if self.model.seq2seq:
+					self.model.cpu(); self.model.is_cuda = False
+					x = x.cpu(); y_intent = y_intent.cpu()
+					print("seq2seq output")
+					self.model.eval()
+					print("guess: " + self.model.decode_intents(x)[0])
+					print("truth: " + self.model.one_hot_to_string(y_intent[0],self.model.Sy_intent))
+					self.model.train()
+					self.model.cuda(); self.model.is_cuda = True
+		train_intent_loss /= num_examples
+		train_intent_acc /= num_examples
+		self.model.unfreeze_one_layer()
+		results = {"intent_loss" : train_intent_loss, "intent_acc" : train_intent_acc, "set": "train"}
+		self.log(results)
+		self.epoch += 1
+		return train_intent_acc, train_intent_loss
 
 	def test(self, dataset):
 		if isinstance(dataset, ASRDataset):
@@ -200,6 +223,35 @@ class Trainer:
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
 			self.log(results)
 			return test_intent_acc, test_intent_loss 
+	
+	def pipeline_test_decoder(self, dataset):
+		test_intent_acc = 0
+		test_intent_loss = 0
+		num_examples = 0
+		self.model.eval()
+		self.model.cpu(); self.model.is_cuda = False # beam search is memory-intensive; do on CPU for now
+		for idx, batch in enumerate(dataset.loader):
+			x,x_path, y_intent = batch
+			batch_size = len(x)
+			num_examples += batch_size
+			x_words = self.model.get_words(x)
+			intent_loss, intent_acc = self.model.run_pipeline(x_words,y_intent)
+			test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
+			test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
+			if self.model.seq2seq and self.epoch > 1:
+				print("decoding batch %d" % idx)
+				guess_strings = np.array(self.model.decode_intents(x))
+				truth_strings = np.array([self.model.one_hot_to_string(y_intent[i],self.model.Sy_intent) for i in range(batch_size)])
+				test_intent_acc += (guess_strings == truth_strings).mean() * batch_size
+				print("acc: " + str((guess_strings == truth_strings).mean()))
+				print("guess: " + guess_strings[0])
+				print("truth: " + truth_strings[0])
+		self.model.cuda(); self.model.is_cuda = True
+		test_intent_loss /= num_examples
+		test_intent_acc /= num_examples
+		results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
+		self.log(results)
+		return test_intent_acc, test_intent_loss
 
 	def get_error(self, dataset, error_path=None):
 		if isinstance(dataset, ASRDataset):
