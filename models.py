@@ -827,6 +827,18 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
+	def get_words(self, x):
+		"""
+		x : Tensor of shape (batch size, T)
+		y_intent : LongTensor of shape (batch size, num_slots)
+		"""
+		_, x_words= self.pretrained_model.compute_posteriors(x)
+		x_words_old_shape=x_words.shape
+		x_words = x_words.view(x_words.shape[0]*x_words.shape[1], -1)
+		final_words=x_words.max(1)[1]
+		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1])
+		return final_words
+
 	def test(self, x, y_intent):
 		"""
 		x : Tensor of shape (batch size, T)

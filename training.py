@@ -118,6 +118,37 @@ class Trainer:
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
+	def get_word_SLU(self, dataset, Sy_word, print_interval=100):
+		train_intent_acc = 0
+		train_intent_loss = 0
+		num_examples = 0
+		self.model.train()
+		self.model.print_frozen()
+		actual_words_complete=[]
+		for idx, batch in enumerate(tqdm(dataset.loader)):
+			x,_,y_intent = batch
+			batch_size = len(x)
+			num_examples += batch_size
+			x_words = self.model.get_words(x)
+			actual_words=[[Sy_word[k] for k in j] for j in x_words]
+			actual_words_complete=actual_words_complete+actual_words
+		return actual_words_complete
+
+	def pipeline_train_decoder(self, dataset, print_interval=100):
+		train_intent_acc = 0
+		train_intent_loss = 0
+		num_examples = 0
+		self.model.train()
+		self.model.print_frozen()
+		for idx, batch in enumerate(tqdm(dataset.loader)):
+			x,_,y_intent = batch
+			batch_size = len(x)
+			num_examples += batch_size
+			x_words = self.model.get_words(x)
+			print(x_words)
+			break
+		return 
+
 	def test(self, dataset):
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
