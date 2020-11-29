@@ -20,29 +20,29 @@ class Trainer:
 		self.epoch = 0
 		self.df = None
 
-	def load_checkpoint(self):
-		if os.path.isfile(os.path.join(self.checkpoint_path, "model_state.pth")):
+	def load_checkpoint(self,model_path="model_state.pth"):
+		if os.path.isfile(os.path.join(self.checkpoint_path, model_path)):
 			try:
 				if self.model.is_cuda:
-					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "model_state.pth")))
+					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, model_path)))
 				else:
-					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, "model_state.pth"), map_location="cpu"))
+					self.model.load_state_dict(torch.load(os.path.join(self.checkpoint_path, model_path), map_location="cpu"))
 			except:
 				print("Could not load previous model; starting from scratch")
 		else:
 			print("No previous model; starting from scratch")
 
-	def save_checkpoint(self):
+	def save_checkpoint(self,model_path="model_state.pth"):
 		try:
-			torch.save(self.model.state_dict(), os.path.join(self.checkpoint_path, "model_state.pth"))
+			torch.save(self.model.state_dict(), os.path.join(self.checkpoint_path, model_path))
 		except:
 			print("Could not save model")
 
-	def log(self, results):
+	def log(self, results, log_file="log.csv"):
 		if self.df is None:
 			self.df = pd.DataFrame(columns=[field for field in results])
 		self.df.loc[len(self.df)] = results
-		self.df.to_csv(os.path.join(self.checkpoint_path, "log.csv"))
+		self.df.to_csv(os.path.join(self.checkpoint_path, log_file))
 
 	def train(self, dataset, print_interval=100):
 		# TODO: refactor to remove if-statement?
@@ -118,7 +118,7 @@ class Trainer:
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
-	def get_word_SLU(self, dataset, Sy_word, print_interval=100):
+	def get_word_SLU(self, dataset, Sy_word, postprocess_words=False, print_interval=100):
 		train_intent_acc = 0
 		train_intent_loss = 0
 		num_examples = 0
@@ -130,11 +130,25 @@ class Trainer:
 			batch_size = len(x)
 			num_examples += batch_size
 			x_words = self.model.get_words(x)
-			actual_words=[[Sy_word[k] for k in j] for j in x_words]
+			if postprocess_words:
+				x_words_new=[]
+				for j in x_words:
+					cur_list=[]
+					prev_k=0
+					for k in j:
+						if k==0:
+							continue
+						if k==prev_k:
+							continue
+						cur_list.append(k)
+						prev_k=k
+					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
+					x_words_new.append(cur_list)
+			actual_words=[[Sy_word[k] for k in j] for j in x_words_new]
 			actual_words_complete=actual_words_complete+actual_words
 		return actual_words_complete
 
-	def pipeline_train_decoder(self, dataset, print_interval=100):
+	def pipeline_train_decoder(self, dataset, postprocess_words=False, print_interval=100,gold=False, log_file="log.csv"):
 		train_intent_acc = 0
 		train_intent_loss = 0
 		num_examples = 0
@@ -144,7 +158,29 @@ class Trainer:
 			x,_,y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			x_words = self.model.get_words(x)
+			if gold:
+				x_words=x.type(torch.LongTensor)
+				if torch.cuda.is_available():
+					x_words = x_words.cuda()
+			else:
+				x_words = self.model.get_words(x)
+				if postprocess_words:
+					x_words_new=[]
+					for j in x_words:
+						cur_list=[]
+						prev_k=0
+						for k in j:
+							if k==0:
+								continue
+							if k==prev_k:
+								continue
+							cur_list.append(k)
+							prev_k=k
+						cur_list=cur_list+([0]*(len(j)-len(cur_list)))
+						x_words_new.append(cur_list)
+					x_words=torch.LongTensor(x_words_new)
+					if torch.cuda.is_available():
+						x_words = x_words.cuda()
 			intent_loss, intent_acc = self.model.run_pipeline(x_words,y_intent)
 			loss = intent_loss
 			self.optimizer.zero_grad()
@@ -168,7 +204,7 @@ class Trainer:
 		train_intent_acc /= num_examples
 		self.model.unfreeze_one_layer()
 		results = {"intent_loss" : train_intent_loss, "intent_acc" : train_intent_acc, "set": "train"}
-		self.log(results)
+		self.log(results, log_file)
 		self.epoch += 1
 		return train_intent_acc, train_intent_loss
 
@@ -224,7 +260,7 @@ class Trainer:
 			self.log(results)
 			return test_intent_acc, test_intent_loss 
 	
-	def pipeline_test_decoder(self, dataset):
+	def pipeline_test_decoder(self, dataset, postprocess_words=False, log_file="log.csv"):
 		test_intent_acc = 0
 		test_intent_loss = 0
 		num_examples = 0
@@ -235,6 +271,21 @@ class Trainer:
 			batch_size = len(x)
 			num_examples += batch_size
 			x_words = self.model.get_words(x)
+			if postprocess_words:
+				x_words_new=[]
+				for j in x_words:
+					cur_list=[]
+					prev_k=0
+					for k in j:
+						if k==0:
+							continue
+						if k==prev_k:
+							continue
+						cur_list.append(k)
+						prev_k=k
+					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
+					x_words_new.append(cur_list)
+				x_words=torch.LongTensor(x_words_new)
 			intent_loss, intent_acc = self.model.run_pipeline(x_words,y_intent)
 			test_intent_loss += intent_loss.cpu().data.numpy().item() * batch_size
 			test_intent_acc += intent_acc.cpu().data.numpy().item() * batch_size
@@ -250,7 +301,7 @@ class Trainer:
 		test_intent_loss /= num_examples
 		test_intent_acc /= num_examples
 		results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
-		self.log(results)
+		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
 	def get_error(self, dataset, error_path=None):

@@ -676,8 +676,8 @@ class Model(torch.nn.Module):
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
 		if pipeline:
-			self.embedding=torch.nn.Embedding(config.vocabulary_size,pretrained_model.word_linear.weight.data.shape[1])
-			self.embedding.weight=pretrained_model.word_linear.weight
+			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
+			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data
 			self.embedding.weight.requires_grad = False
 		# fixed-length output:
 		if not self.seq2seq:
