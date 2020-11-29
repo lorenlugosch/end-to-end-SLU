@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 from models import PretrainedModel, Model
 from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
@@ -12,6 +13,7 @@ parser.add_argument('--pretrain', action='store_true', help='run ASR pre-trainin
 parser.add_argument('--train', action='store_true', help='run SLU training')
 parser.add_argument('--pipeline_train', action='store_true', help='run SLU training in pipeline manner')
 parser.add_argument('--get_words', action='store_true', help='get words from SLU pipeline')
+parser.add_argument('--save_words_path', default="/tmp/word_transcriptions.csv", help='path to save audio transcription CSV file')
 parser.add_argument('--postprocess_words', action='store_true', help='postprocess words obtained from SLU pipeline')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
@@ -90,8 +92,9 @@ if get_words:
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
-	predicted_words=trainer.get_word_SLU(train_dataset,Sy_word, postprocess_words)
-	print(predicted_words)
+	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words)
+	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words})
+	df.to_csv(args.save_words_path, index=False)
 
 if pipeline_train:
 	# Generate datasets

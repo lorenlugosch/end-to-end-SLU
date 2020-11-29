@@ -125,8 +125,9 @@ class Trainer:
 		self.model.train()
 		self.model.print_frozen()
 		actual_words_complete=[]
+		audio_paths=[]
 		for idx, batch in enumerate(tqdm(dataset.loader)):
-			x,_,y_intent = batch
+			x, x_paths, y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
 			x_words = self.model.get_words(x)
@@ -146,7 +147,8 @@ class Trainer:
 					x_words_new.append(cur_list)
 			actual_words=[[Sy_word[k] for k in j] for j in x_words_new]
 			actual_words_complete=actual_words_complete+actual_words
-		return actual_words_complete
+			audio_paths.extend(x_paths)
+		return actual_words_complete, audio_paths
 
 	def pipeline_train_decoder(self, dataset, postprocess_words=False, print_interval=100,gold=False, log_file="log.csv"):
 		train_intent_acc = 0
