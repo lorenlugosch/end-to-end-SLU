@@ -11,6 +11,7 @@ import multiprocessing
 import json
 import pandas as pd
 from subprocess import call
+from string import punctuation
 
 class Config:
 	def __init__(self):
@@ -129,7 +130,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config):
+def get_SLU_datasets(config,use_gold_utterances=False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -235,7 +236,14 @@ def get_SLU_datasets(config):
 		print("No phoneme file found.")
 
 	# Create dataset objects
-	train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	if use_gold_utterances:
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		train_dataset = SLU_GoldDataset(train_df, base_path, Sy_word, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
+	else:
+		train_dataset = SLUDataset(train_df, base_path, Sy_intent, config,upsample_factor=config.dataset_upsample_factor)
 	valid_dataset = SLUDataset(valid_df, base_path, Sy_intent, config)
 	test_dataset = SLUDataset(test_df, base_path, Sy_intent, config)
 
@@ -328,6 +336,52 @@ class SLUDataset(torch.utils.data.Dataset):
 			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
 			y_intent.append(self.Sy_intent.index("<eos>"))
 
+		return (x, self.df.loc[idx].path, y_intent)
+
+class SLU_GoldDataset(torch.utils.data.Dataset):
+	def __init__(self, df, base_path, Sy_word, Sy_intent, config, upsample_factor=1):
+		"""
+		df:
+		Sy_intent: Dictionary (transcript --> slot values)
+		config: Config object (contains info about model and training)
+		"""
+		self.df = df
+		self.base_path = base_path
+		self.Sy_intent = Sy_intent
+		self.Sy_word = Sy_word
+
+		self.upsample_factor = upsample_factor
+		self.augment = False #augment
+		self.SNRs = [0,5,10,15,20]
+		self.seq2seq = config.seq2seq
+		self.config_vocab_size = config.vocabulary_size
+		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
+
+	def __len__(self):
+		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
+		return len(self.df) * self.upsample_factor
+
+	def __getitem__(self, idx):
+		#augment = ((idx / len(self.df)) > 1) and self.augment
+		#true_idx = idx
+		idx = idx % len(self.df)
+
+		wav_path = os.path.join(self.base_path, self.df.loc[idx].path)
+		effect = torchaudio.sox_effects.SoxEffectsChain()
+		effect.set_input_file(wav_path)
+		x_utterance = self.df.loc[idx].transcription.split(" ")
+		x=[self.Sy_word.index(k.lower().strip(punctuation)) if k.lower().strip(punctuation) in self.Sy_word else self.config_vocab_size for k in x_utterance]
+
+		if not self.seq2seq:
+			y_intent = [] 
+			for slot in ["action", "object", "location"]:
+				value = self.df.loc[idx][slot]
+				y_intent.append(self.Sy_intent[slot][value])
+		else:
+			# need sos, eos
+			y_intent = [self.Sy_intent.index("<sos>")]
+			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
+			y_intent.append(self.Sy_intent.index("<eos>"))
 		return (x, self.df.loc[idx].path, y_intent)
 
 def one_hot(letters, S):
