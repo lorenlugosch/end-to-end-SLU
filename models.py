@@ -694,11 +694,12 @@ def obtain_fasttext_embeddings(filename, vocab,dim=300):
 	data = {}
 	for line in fin:
 		tokens = line.rstrip().split(' ')
-		data[tokens[0]] = map(float, tokens[1:])
+		emb_list=[float(k) for k in tokens[1:]]
+		data[tokens[0]] = emb_list
 	
 	word_embeddings = []
 	for word in vocab:
-		if word in word_vecs:
+		if word in data:
 			embed=data[word]
 		else:
 			embed=np.random.normal(scale=0.6, size=(dim, ))

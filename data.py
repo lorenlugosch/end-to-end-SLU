@@ -209,8 +209,8 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 			for idx,value in enumerate(slot_values):
 				Sy_intent[slot][value] = idx
 			values_per_slot.append(len(slot_values))
-		print(f"Saved slot-name-to-index mapping to /home/ec2-user/intent_mapping.json")
-		json.dump(Sy_intent, open("/home/ec2-user/intent_mapping.json", 'w'))
+		# print(f"Saved slot-name-to-index mapping to /home/ec2-user/intent_mapping.json")
+		# json.dump(Sy_intent, open("/home/ec2-user/intent_mapping.json", 'w'))
 		config.values_per_slot = values_per_slot
 		config.Sy_intent = Sy_intent
 	else: #seq2seq
