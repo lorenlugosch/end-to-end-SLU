@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import pandas as pd
-from models import PretrainedModel, Model, obtain_glove_embeddings
+from models import PretrainedModel, Model, obtain_glove_embeddings, obtain_fasttext_embeddings
 from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
 import argparse
@@ -16,7 +16,8 @@ parser.add_argument('--get_words', action='store_true', help='get words from SLU
 parser.add_argument('--save_words_path', default="/tmp/word_transcriptions.csv", help='path to save audio transcription CSV file')
 parser.add_argument('--postprocess_words', action='store_true', help='postprocess words obtained from SLU pipeline')
 parser.add_argument('--use_semantic_embeddings', action='store_true', help='use Glove embeddings')
-parser.add_argument('--semantic_embeddings_path', type=str, help='path for Glove embeddings')
+parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
+parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
 parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
@@ -33,6 +34,7 @@ postprocess_words = args.postprocess_words
 restart = args.restart
 config_path = args.config_path
 use_semantic_embeddings = args.use_semantic_embeddings
+use_FastText_embeddings = args.use_FastText_embeddings
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 random_split = args.random_split
@@ -66,26 +68,64 @@ if pretrain:
 
 if train:
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
 
 	# Initialize final model
-	model = Model(config=config)
+	if use_semantic_embeddings:
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings)
+	elif use_FastText_embeddings:
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
+	else:
+		model = Model(config=config)
+
+	log_file="log"
+	model_path="model_state"
+
+	if postprocess_words:
+		log_file=log_file+"_postprocess"
+		model_path=model_path + "_postprocess"
+	if disjoint_split:
+		log_file=log_file+"_disjoint"
+		model_path=model_path + "_disjoint"
+	elif random_split:
+		log_file=log_file+"_random"
+		model_path=model_path + "_random"
+
+	if use_semantic_embeddings:
+		log_file=log_file+"_glove"
+		model_path=model_path + "_glove"
+	elif use_FastText_embeddings:
+		log_file=log_file+"_FastText"
+		model_path=model_path + "_FastText"
+
+	log_file=log_file+".csv"
+	model_path=model_path + ".pth"
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
-
+	
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-		train_intent_acc, train_intent_loss = trainer.train(train_dataset)
-		valid_intent_acc, valid_intent_loss = trainer.test(valid_dataset)
+		train_intent_acc, train_intent_loss = trainer.train(train_dataset,log_file=log_file)
+		valid_intent_acc, valid_intent_loss = trainer.test(valid_dataset,log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
-		trainer.save_checkpoint()
+		trainer.save_checkpoint(model_path=model_path)
 
-	test_intent_acc, test_intent_loss = trainer.test(test_dataset)
+	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 

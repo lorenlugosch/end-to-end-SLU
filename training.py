@@ -44,7 +44,7 @@ class Trainer:
 		self.df.loc[len(self.df)] = results
 		self.df.to_csv(os.path.join(self.checkpoint_path, log_file))
 
-	def train(self, dataset, print_interval=100):
+	def train(self, dataset, print_interval=100, log_file="log.csv"):
 		# TODO: refactor to remove if-statement?
 		if isinstance(dataset, ASRDataset):
 			train_phone_acc = 0
@@ -78,7 +78,7 @@ class Trainer:
 			train_word_loss /= num_examples
 			train_word_acc /= num_examples
 			results = {"phone_loss" : train_phone_loss, "phone_acc" : train_phone_acc, "word_loss" : train_word_loss, "word_acc" : train_word_acc, "set": "train"}
-			self.log(results)
+			self.log(results, log_file)
 			self.epoch += 1
 			return train_phone_acc, train_phone_loss, train_word_acc, train_word_loss
 		else: # SLUDataset
@@ -114,7 +114,7 @@ class Trainer:
 			train_intent_acc /= num_examples
 			self.model.unfreeze_one_layer()
 			results = {"intent_loss" : train_intent_loss, "intent_acc" : train_intent_acc, "set": "train"}
-			self.log(results)
+			self.log(results, log_file)
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
@@ -210,7 +210,7 @@ class Trainer:
 		self.epoch += 1
 		return train_intent_acc, train_intent_loss
 
-	def test(self, dataset):
+	def test(self, dataset, log_file="log.csv"):
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
@@ -232,7 +232,7 @@ class Trainer:
 			test_word_loss /= num_examples
 			test_word_acc /= num_examples
 			results = {"phone_loss" : test_phone_loss, "phone_acc" : test_phone_acc, "word_loss" : test_word_loss, "word_acc" : test_word_acc,"set": "valid"}
-			self.log(results)
+			self.log(results, log_file)
 			return test_phone_acc, test_phone_loss, test_word_acc, test_word_loss 
 		else:
 			test_intent_acc = 0
@@ -259,7 +259,7 @@ class Trainer:
 			test_intent_loss /= num_examples
 			test_intent_acc /= num_examples
 			results = {"intent_loss" : test_intent_loss, "intent_acc" : test_intent_acc, "set": "valid"}
-			self.log(results)
+			self.log(results, log_file)
 			return test_intent_acc, test_intent_loss 
 	
 	def pipeline_test_decoder(self, dataset, postprocess_words=False, log_file="log.csv"):

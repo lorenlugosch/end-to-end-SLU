@@ -3,6 +3,7 @@ import numpy as np
 import sys
 import os
 import math
+import io
 
 np.random.seed(0)
 
@@ -682,6 +683,33 @@ def obtain_glove_embeddings(filename, vocab,dim=100):
 	word_embeddings = np.array(word_embeddings)
 	return word_embeddings
 
+def obtain_fasttext_embeddings(filename, vocab,dim=300):
+	
+	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
+	
+	# vocab = [k for k,v in word_to_ix.items()]
+	
+	fin = io.open(filename, 'r', encoding='utf-8', newline='\n', errors='ignore')
+	n, d = map(int, fin.readline().split())
+	data = {}
+	for line in fin:
+		tokens = line.rstrip().split(' ')
+		data[tokens[0]] = map(float, tokens[1:])
+	
+	word_embeddings = []
+	for word in vocab:
+		if word in word_vecs:
+			embed=data[word]
+		else:
+			embed=np.random.normal(scale=0.6, size=(dim, ))
+		word_embeddings.append(embed)
+	
+	embed=np.random.normal(scale=0.6, size=(dim, )) # add embedding for unk
+	word_embeddings.append(embed)
+
+	word_embeddings = np.array(word_embeddings)
+	return word_embeddings
+
 class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
@@ -843,6 +871,9 @@ class Model(torch.nn.Module):
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
+		if self.use_semantic_embeddings:
+			x_words = self.get_words(x)
+			out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1)
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:
