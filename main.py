@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import pandas as pd
-from models import PretrainedModel, Model
+from models import PretrainedModel, Model, obtain_glove_embeddings
 from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
 import argparse
@@ -15,6 +15,11 @@ parser.add_argument('--pipeline_train', action='store_true', help='run SLU train
 parser.add_argument('--get_words', action='store_true', help='get words from SLU pipeline')
 parser.add_argument('--save_words_path', default="/tmp/word_transcriptions.csv", help='path to save audio transcription CSV file')
 parser.add_argument('--postprocess_words', action='store_true', help='postprocess words obtained from SLU pipeline')
+parser.add_argument('--use_semantic_embeddings', action='store_true', help='use Glove embeddings')
+parser.add_argument('--semantic_embeddings_path', type=str, help='path for Glove embeddings')
+parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
+parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
+parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
@@ -27,6 +32,11 @@ get_words = args.get_words
 postprocess_words = args.postprocess_words
 restart = args.restart
 config_path = args.config_path
+use_semantic_embeddings = args.use_semantic_embeddings
+semantic_embeddings_path = args.semantic_embeddings_path
+finetune_embedding = args.finetune_embedding
+random_split = args.random_split
+disjoint_split = args.disjoint_split
 
 # Read config file
 config = read_config(config_path)
@@ -104,8 +114,16 @@ if pipeline_train:
 			Sy_word.append(line.rstrip("\n"))
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
 
+	if postprocess_words:
+		log_file="log_pipeline_postprocess.csv"
+	else:
+		if finetune_embedding:
+			log_file="log_pieline_finetune.csv"
+		else:
+			log_file="log_pipeline.csv"
+	
 	# Initialize final model
-	model = Model(config=config,pipeline=True)
+	model = Model(config=config,pipeline=True,finetune=finetune_embedding)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -113,33 +131,63 @@ if pipeline_train:
 
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
-		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file="log_pipeline_postprocess.csv")
-		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,  postprocess_words,log_file="log_pipeline_postprocess.csv")
+		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file=log_file)
+		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset,  postprocess_words,log_file=log_file)
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
+		if postprocess_words:
+			trainer.save_checkpoint(model_path="model_state_postprocess.pth")
+		else:
+			if finetune_embedding:
+				trainer.save_checkpoint(model_path="model_state_pipeline_finetune.pth")
+			else:
+				trainer.save_checkpoint(model_path="model_state_pipeline.pth")
 
-		trainer.save_checkpoint(model_path="model_state_postprocess.pth")
-
-	test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, postprocess_words,log_file="log_pipeline_postprocess.csv")
+	test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, postprocess_words,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 if pipeline_gold_train:
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split)
 
 	# Initialize final model
-	model = Model(config=config,pipeline=True)
+	if use_semantic_embeddings:
+		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, train_dataset.Sy_word )
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings)
+	else:
+		model = Model(config=config,pipeline=True, use_semantic_embeddings = False)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
 
+	log_file="log_pipeline_gold"
+	only_model_path="only_gold_model_state"
+	with_model_path="with_gold_model_state"
+
 	if postprocess_words:
-		log_file="log_pipeline_gold_postprocess.csv"
-	else:
-		log_file="log_pipeline_gold.csv"
+		log_file=log_file+"_postprocess"
+		only_model_path=only_model_path + "_postprocess"
+		with_model_path=with_model_path + "_postprocess"
+	if disjoint_split:
+		log_file=log_file+"_disjoint"
+		only_model_path=only_model_path + "_disjoint"
+		with_model_path=with_model_path + "_disjoint"
+	elif random_split:
+		log_file=log_file+"_random"
+		only_model_path=only_model_path + "_random"
+		with_model_path=with_model_path + "_random"
+
+	if use_semantic_embeddings:
+		log_file=log_file+"_glove"
+		only_model_path=only_model_path + "_glove"
+		with_model_path=with_model_path + "_glove"
+
+	log_file=log_file+".csv"
+	only_model_path=only_model_path + ".pth"
+	with_model_path=with_model_path + ".pth"
 
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
@@ -148,12 +196,9 @@ if pipeline_gold_train:
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
-		if postprocess_words:
-			trainer.save_checkpoint(model_path="only_gold_model_state_postprocess.pth")
-		else:
-			trainer.save_checkpoint(model_path="only_gold_model_state.pth")
+		trainer.save_checkpoint(model_path=only_model_path)
 	
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file=log_file)
@@ -161,10 +206,7 @@ if pipeline_gold_train:
 
 		print("========= Results: epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
-		if postprocess_words:
-			trainer.save_checkpoint(model_path="with_gold_model_state_postprocess.pth")
-		else:
-			trainer.save_checkpoint(model_path="with_gold_model_state.pth")
+		trainer.save_checkpoint(model_path=with_model_path)
 
 	test_intent_acc, test_intent_loss = trainer.pipeline_test_decoder(test_dataset, postprocess_words, log_file=log_file)
 	print("========= Test results =========")
