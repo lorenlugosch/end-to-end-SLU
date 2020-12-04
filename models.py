@@ -3,6 +3,9 @@ import numpy as np
 import sys
 import os
 import math
+import io
+
+np.random.seed(0)
 
 def flip(x, dim):
 	xsize = x.size()
@@ -650,11 +653,69 @@ class Seq2SeqDecoder(torch.nn.Module):
 
 		return beam_scores, beam
 
+def obtain_glove_embeddings(filename, vocab,dim=100):
+	
+	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
+	
+	# vocab = [k for k,v in word_to_ix.items()]
+	
+	word_vecs={}
+	with open(filename, 'rb') as f:
+		for l in f:
+			line = l.decode().split()
+			word = line[0]
+			if "." in line[1:]:
+				print(line)
+			vect = np.array(line[1:]).astype(np.float)
+			word_vecs[word]=vect
+	
+	word_embeddings = []
+	for word in vocab:
+		if word in word_vecs:
+			embed=word_vecs[word]
+		else:
+			embed=np.random.normal(scale=0.6, size=(dim, ))
+		word_embeddings.append(embed)
+	
+	embed=np.random.normal(scale=0.6, size=(dim, )) # add embedding for unk
+	word_embeddings.append(embed)
+
+	word_embeddings = np.array(word_embeddings)
+	return word_embeddings
+
+def obtain_fasttext_embeddings(filename, vocab,dim=300):
+	
+	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
+	
+	# vocab = [k for k,v in word_to_ix.items()]
+	
+	fin = io.open(filename, 'r', encoding='utf-8', newline='\n', errors='ignore')
+	n, d = map(int, fin.readline().split())
+	data = {}
+	for line in fin:
+		tokens = line.rstrip().split(' ')
+		emb_list=[float(k) for k in tokens[1:]]
+		data[tokens[0]] = emb_list
+	
+	word_embeddings = []
+	for word in vocab:
+		if word in data:
+			embed=data[word]
+		else:
+			embed=np.random.normal(scale=0.6, size=(dim, ))
+		word_embeddings.append(embed)
+	
+	embed=np.random.normal(scale=0.6, size=(dim, )) # add embedding for unk
+	word_embeddings.append(embed)
+
+	word_embeddings = np.array(word_embeddings)
+	return word_embeddings
+
 class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -677,8 +738,14 @@ class Model(torch.nn.Module):
 			out_dim *= 2 
 		if pipeline:
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
-			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data
-			self.embedding.weight.requires_grad = False
+			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
+			self.embedding.weight.requires_grad = finetune
+		self.use_semantic_embeddings = use_semantic_embeddings
+		if use_semantic_embeddings:
+			self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
+			self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
+			out_dim=out_dim+glove_emb_dim
+			self.semantic_embeddings.weight.requires_grad = False
 		# fixed-length output:
 		if not self.seq2seq:
 			self.values_per_slot = config.values_per_slot
@@ -805,6 +872,9 @@ class Model(torch.nn.Module):
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
+		if self.use_semantic_embeddings:
+			x_words = self.get_words(x)
+			out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1)
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:
@@ -838,6 +908,9 @@ class Model(torch.nn.Module):
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
 		out = self.embedding(x)
+
+		if self.use_semantic_embeddings:
+			out = torch.cat((out,self.semantic_embeddings(x)),dim=-1)
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:

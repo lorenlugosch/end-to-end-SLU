@@ -130,7 +130,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -139,7 +139,12 @@ def get_SLU_datasets(config,use_gold_utterances=False):
 	# Split
 	if not config.seq2seq:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
-		real_train_df = pd.read_csv(os.path.join(base_path, "data", "train_data.csv"))
+		if random_split:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "train_data.csv"))
+		elif disjoint_split:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
+		else:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
 		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
 	else:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data_seq2seq.csv"))
@@ -181,8 +186,15 @@ def get_SLU_datasets(config,use_gold_utterances=False):
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
 	if not config.seq2seq:
-		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data.csv"))
-		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data.csv"))
+		if random_split:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "test_data.csv"))
+		elif disjoint_split:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "test_data.csv"))
+		else:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
 	else:
 		valid_df = pd.read_csv(os.path.join(base_path, "data", "valid_data_seq2seq.csv"))
 		test_df = pd.read_csv(os.path.join(base_path, "data", "test_data_seq2seq.csv"))
@@ -197,8 +209,8 @@ def get_SLU_datasets(config,use_gold_utterances=False):
 			for idx,value in enumerate(slot_values):
 				Sy_intent[slot][value] = idx
 			values_per_slot.append(len(slot_values))
-		print(f"Saved slot-name-to-index mapping to /home/ec2-user/intent_mapping.json")
-		json.dump(Sy_intent, open("/home/ec2-user/intent_mapping.json", 'w'))
+		# print(f"Saved slot-name-to-index mapping to /home/ec2-user/intent_mapping.json")
+		# json.dump(Sy_intent, open("/home/ec2-user/intent_mapping.json", 'w'))
 		config.values_per_slot = values_per_slot
 		config.Sy_intent = Sy_intent
 	else: #seq2seq
