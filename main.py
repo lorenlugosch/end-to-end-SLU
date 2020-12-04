@@ -24,6 +24,7 @@ parser.add_argument('--disjoint_split', action='store_true', help='split dataset
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
+parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
@@ -39,6 +40,7 @@ semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
 random_split = args.random_split
 disjoint_split = args.disjoint_split
+save_best_model = args.save_best_model
 
 # Read config file
 config = read_config(config_path)
@@ -108,6 +110,10 @@ if train:
 		log_file=log_file+"_FastText"
 		model_path=model_path + "_FastText"
 
+	if save_best_model:
+		best_model_path=model_path + "_best.pth"
+		best_valid_acc=0.0
+
 	log_file=log_file+".csv"
 	model_path=model_path + ".pth"
 
@@ -124,10 +130,19 @@ if train:
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 		trainer.save_checkpoint(model_path=model_path)
+		if save_best_model:
+			if (valid_intent_acc>best_valid_acc):
+				best_valid_acc=valid_intent_acc
+				best_valid_loss=valid_intent_loss
+				trainer.save_checkpoint(model_path=best_model_path)		
 
 	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
+	trainer.load_checkpoint(model_path=best_model_path)
+	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
+	print("========= Test results =========")
+	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 
 if get_words:
 	# Generate datasets
@@ -158,7 +173,7 @@ if pipeline_train:
 		log_file="log_pipeline_postprocess.csv"
 	else:
 		if finetune_embedding:
-			log_file="log_pieline_finetune.csv"
+			log_file="log_pipeline_finetune.csv"
 		else:
 			log_file="log_pipeline.csv"
 	
