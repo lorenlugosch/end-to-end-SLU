@@ -1,34 +1,53 @@
 import torch
 import numpy as np
-from models import PretrainedModel, Model
+from models import PretrainedModel, Model, obtain_fasttext_embeddings
 from data import get_ASR_datasets, get_SLU_datasets, read_config
 from training import Trainer
 import argparse
+import os
 
 # Get args
 parser = argparse.ArgumentParser()
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, required=True, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--error_path', type=str, required=True, help='path to store list of files with predicted errors.')
+parser.add_argument('--model_path', type=str, required=True, help='path of model to load')
+parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
+parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
+parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 args = parser.parse_args()
 restart = args.restart
 config_path = args.config_path
+model_path = args.model_path
+use_FastText_embeddings = args.use_FastText_embeddings
+semantic_embeddings_path = args.semantic_embeddings_path
+disjoint_split = args.disjoint_split
+
 
 # Read config file
 config = read_config(config_path)
 torch.manual_seed(config.seed); np.random.seed(config.seed)
 
 # Generate datasets
-train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
+train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split)
 
 # Initialize final model
-model = Model(config=config)
+if use_FastText_embeddings:
+	Sy_word = []
+	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+		for line in f.readlines():
+			Sy_word.append(line.rstrip("\n"))
+	FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+	model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
+else:
+	model = Model(config=config)
 
 # Train the final model
 trainer = Trainer(model=model, config=config)
-if restart: trainer.load_checkpoint()
+if restart: trainer.load_checkpoint(model_path)
 
 
 test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path)
 print("========= Test results =========")
 print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
+

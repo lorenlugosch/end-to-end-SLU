@@ -19,11 +19,13 @@ parser.add_argument('--use_semantic_embeddings', action='store_true', help='use 
 parser.add_argument('--use_FastText_embeddings', action='store_true', help='use FastText embeddings')
 parser.add_argument('--semantic_embeddings_path', type=str, help='path for semantic embeddings')
 parser.add_argument('--finetune_embedding', action='store_true', help='tune SLU embeddings')
+parser.add_argument('--finetune_semantics_embedding', action='store_true', help='tune semantics embeddings')
 parser.add_argument('--random_split', action='store_true', help='randomly split dataset')
 parser.add_argument('--disjoint_split', action='store_true', help='split dataset with disjoint utterances in train set and test set')
 parser.add_argument('--restart', action='store_true', help='load checkpoint from a previous run')
 parser.add_argument('--config_path', type=str, help='path to config file with hyperparameters, etc.')
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
+parser.add_argument('--seperate_RNN', action='store_true', help='run seperate RNNs over semantic embeddings and over SLU output')
 parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -38,9 +40,11 @@ use_semantic_embeddings = args.use_semantic_embeddings
 use_FastText_embeddings = args.use_FastText_embeddings
 semantic_embeddings_path = args.semantic_embeddings_path
 finetune_embedding = args.finetune_embedding
+finetune_semantics_embedding = args.finetune_semantics_embedding
 random_split = args.random_split
 disjoint_split = args.disjoint_split
 save_best_model = args.save_best_model
+seperate_RNN = args.seperate_RNN
 
 # Read config file
 config = read_config(config_path)
@@ -69,27 +73,6 @@ if pretrain:
 		trainer.save_checkpoint()
 
 if train:
-	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
-
-	# Initialize final model
-	if use_semantic_embeddings:
-		Sy_word = []
-		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
-			for line in f.readlines():
-				Sy_word.append(line.rstrip("\n"))
-		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings)
-	elif use_FastText_embeddings:
-		Sy_word = []
-		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
-			for line in f.readlines():
-				Sy_word.append(line.rstrip("\n"))
-		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
-	else:
-		model = Model(config=config)
-
 	log_file="log"
 	model_path="model_state"
 
@@ -110,12 +93,41 @@ if train:
 		log_file=log_file+"_FastText"
 		model_path=model_path + "_FastText"
 
+	if seperate_RNN:
+		log_file=log_file+"_seperate"
+		model_path=model_path + "_seperate"
+
+	if finetune_semantics_embedding:
+		log_file=log_file+"_finetune_semantic"
+		model_path=model_path + "_finetune_semantic"
+
 	if save_best_model:
 		best_model_path=model_path + "_best.pth"
 		best_valid_acc=0.0
 
 	log_file=log_file+".csv"
 	model_path=model_path + ".pth"
+
+	# Generate datasets
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
+
+	# Initialize final model
+	if use_semantic_embeddings:
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN)
+	elif use_FastText_embeddings:
+		Sy_word = []
+		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
+			for line in f.readlines():
+				Sy_word.append(line.rstrip("\n"))
+		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN)
+	else:
+		model = Model(config=config)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
@@ -150,13 +162,24 @@ if get_words:
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split)
 
 	# Initialize final model
-	model = Model(config=config)
+	if use_FastText_embeddings:
+		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
+
+	else:
+		model = Model(config=config)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
+	if use_FastText_embeddings and disjoint_split:
+		trainer.load_checkpoint("model_state_disjoint_FastText_finetune_semantic_best.pth")
+	elif disjoint_split:
+		trainer.load_checkpoint("model_state_disjoint_best.pth")
+	elif use_FastText_embeddings:
+		trainer.load_checkpoint("model_state_FastText.pth")
 	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words)
 	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words})
 	df.to_csv(args.save_words_path, index=False)
