@@ -707,7 +707,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -740,6 +740,8 @@ class Model(torch.nn.Module):
 			if self.seperate_RNN==False: 
 				out_dim=out_dim+glove_emb_dim
 			self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
+			self.smooth_semantic=smooth_semantic
+			self.smooth_semantic_parameter=smooth_semantic_parameter
 		# fixed-length output:
 		if not self.seq2seq:
 			self.values_per_slot = config.values_per_slot
@@ -906,11 +908,17 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
 		if self.use_semantic_embeddings:
-			x_words = self.get_words(x) # get words predicted by ASR
-			if self.seperate_RNN==False:
-				out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1) # Simply concatenate speech embedding with pretrained semantic embedding and pass through common RNN layer
+			if self.smooth_semantic:
+				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
+				smooth_word_emb=self.semantic_embeddings(x_words)
+				word_emb=torch.matmul(x_weight, smooth_word_emb).reshape(x_weight.shape[0],x_weight.shape[1],-1) # multiply the embeddings with the prediction probability to get combined embedding
 			else:
-				semantic_out=self.semantic_embeddings(x_words) # get semantic embeddings 
+				x_words = self.get_words(x) # get words predicted by ASR
+				word_emb=self.semantic_embeddings(x_words)
+			if self.seperate_RNN==False:
+				out = torch.cat((out,word_emb),dim=-1) # Simply concatenate speech embedding with pretrained semantic embedding and pass through common RNN layer
+			else:
+				semantic_out=word_emb # get semantic embeddings 
 
 		if not self.seq2seq:
 			if self.seperate_RNN==False: # Common RNN for semantic and speech embeddings
@@ -984,7 +992,6 @@ class Model(torch.nn.Module):
 	def get_words(self, x):  # code to get predicted utterances from ASR model
 		"""
 		x : Tensor of shape (batch size, T)
-		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		_, x_words= self.pretrained_model.compute_posteriors(x)
 		x_words_old_shape=x_words.shape
@@ -992,6 +999,19 @@ class Model(torch.nn.Module):
 		final_words=x_words.max(1)[1]
 		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1])
 		return final_words
+
+	def get_top_words(self, x, k=5):  # code to return topk words at each point in predicted sequence along with their normalised prediction probabilities 
+		"""
+		x : Tensor of shape (batch size, T)
+		"""
+		_, x_words= self.pretrained_model.compute_posteriors(x)
+		x_words_old_shape=x_words.shape
+		x_words = x_words.view(x_words.shape[0]*x_words.shape[1], -1)
+		final_words_weight, final_words=x_words.topk(k,dim=1)
+		final_words_normalised_weight= torch.transpose(torch.transpose(final_words_weight,0,1)/final_words_weight.sum(1),0,1) # normalise  prob such that probabilities for top k sum to 1
+		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1],k)
+		final_words_normalised_weight=final_words_normalised_weight.reshape(x_words_old_shape[0],x_words_old_shape[1], 1, k)
+		return final_words, final_words_normalised_weight
 
 	def test(self, x, y_intent): # code to return error cases for trained model
 		"""

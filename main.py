@@ -27,6 +27,9 @@ parser.add_argument('--config_path', type=str, help='path to config file with hy
 parser.add_argument('--pipeline_gold_train', action='store_true', help='run SLU training in pipeline manner with gold set utterances')
 parser.add_argument('--seperate_RNN', action='store_true', help='run seperate RNNs over semantic embeddings and over SLU output')
 parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
+parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
+parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
+
 args = parser.parse_args()
 pretrain = args.pretrain
 train = args.train
@@ -45,6 +48,8 @@ random_split = args.random_split
 disjoint_split = args.disjoint_split
 save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
+smooth_semantic = args.smooth_semantic
+smooth_semantic_parameter = int(args.smooth_semantic_parameter)
 
 # Read config file
 config = read_config(config_path)
@@ -95,6 +100,10 @@ if train:
 		log_file=log_file+"_FastText"
 		model_path=model_path + "_FastText"
 
+	if smooth_semantic:
+		log_file=log_file+"_smooth_"+str(smooth_semantic_parameter)
+		model_path=model_path + "_smooth_"+str(smooth_semantic_parameter)
+
 	if seperate_RNN:
 		log_file=log_file+"_seperate"
 		model_path=model_path + "_seperate"
@@ -120,20 +129,21 @@ if train:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	elif use_FastText_embeddings: # Load FastText embedding
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
-		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN)
+		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	else:
 		model = Model(config=config)
 
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
+	# config.training_num_epochs=30 # increased the number of epochs that I run, did not really helped that much since I got best valid accuracy at 11 epoch for topk=10 so I have commented it
 	
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
