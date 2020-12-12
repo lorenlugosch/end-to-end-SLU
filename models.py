@@ -653,11 +653,7 @@ class Seq2SeqDecoder(torch.nn.Module):
 
 		return beam_scores, beam
 
-def obtain_glove_embeddings(filename, vocab,dim=100):
-	
-	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
-	
-	# vocab = [k for k,v in word_to_ix.items()]
+def obtain_glove_embeddings(filename, vocab,dim=100): # Load glove embeddings
 	
 	word_vecs={}
 	with open(filename, 'rb') as f:
@@ -683,11 +679,7 @@ def obtain_glove_embeddings(filename, vocab,dim=100):
 	word_embeddings = np.array(word_embeddings)
 	return word_embeddings
 
-def obtain_fasttext_embeddings(filename, vocab,dim=300):
-	
-	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
-	
-	# vocab = [k for k,v in word_to_ix.items()]
+def obtain_fasttext_embeddings(filename, vocab,dim=300): # Load FastText embeddings
 	
 	fin = io.open(filename, 'r', encoding='utf-8', newline='\n', errors='ignore')
 	n, d = map(int, fin.readline().split())
@@ -736,13 +728,13 @@ class Model(torch.nn.Module):
 		out_dim = config.word_rnn_num_hidden[-1]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
-		if pipeline:
+		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
 			self.embedding.weight.requires_grad = finetune
 		self.use_semantic_embeddings = use_semantic_embeddings
 		self.seperate_RNN=seperate_RNN
-		if use_semantic_embeddings:
+		if use_semantic_embeddings: # Load pretrained semantic embedding to be used along with speech embeddings
 			self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
 			self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
 			if self.seperate_RNN==False: 
@@ -753,7 +745,7 @@ class Model(torch.nn.Module):
 			self.values_per_slot = config.values_per_slot
 			self.num_values_total = sum(self.values_per_slot)
 			num_rnn_layers = len(config.intent_rnn_num_hidden)
-			if self.seperate_RNN:
+			if self.seperate_RNN: # Create seperate RNN layers for semantic embedding
 				self.semantic_layers=[]
 				out_dim_semantic=glove_emb_dim
 				for idx in range(num_rnn_layers):
@@ -914,16 +906,17 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
 		if self.use_semantic_embeddings:
+			x_words = self.get_words(x) # get words predicted by ASR
 			if self.seperate_RNN==False:
-				out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1)
+				out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1) # Simply concatenate speech embedding with pretrained semantic embedding and pass through common RNN layer
 			else:
-				semantic_out=self.semantic_embeddings(x_words)
+				semantic_out=self.semantic_embeddings(x_words) # get semantic embeddings 
 
 		if not self.seq2seq:
-			if self.seperate_RNN==False:
+			if self.seperate_RNN==False: # Common RNN for semantic and speech embeddings
 				for layer in self.intent_layers:
 					out = layer(out)
-			else:
+			else: # seperate RNN for semantic and speech embeddings
 				for layer in self.intent_layers:
 					out = layer(out)
 				for layer in self.semantic_layers:
@@ -952,9 +945,9 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def run_pipeline(self, x, y_intent):
+	def run_pipeline(self, x, y_intent): # code to run pipeline model
 		"""
-		x : Tensor of shape (batch size, T)
+		x : LongTensor of shape (batch size, T) - utterance over which intent module is trained
 		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		if self.is_cuda:
@@ -988,7 +981,7 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def get_words(self, x):
+	def get_words(self, x):  # code to get predicted utterances from ASR model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -1000,7 +993,7 @@ class Model(torch.nn.Module):
 		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1])
 		return final_words
 
-	def test(self, x, y_intent):
+	def test(self, x, y_intent): # code to return error cases for trained model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -1029,7 +1022,7 @@ class Model(torch.nn.Module):
 			predicted_intent = torch.stack(predicted_intent, dim=1)
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
-			return predicted_intent,y_intent,intent_loss, intent_acc
+			return predicted_intent,y_intent,intent_loss, intent_acc # return both predicted as well as gold intent
 
 		else: # seq2seq
 			out = self.encoder(out)

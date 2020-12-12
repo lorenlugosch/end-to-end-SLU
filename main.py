@@ -73,6 +73,8 @@ if pretrain:
 		trainer.save_checkpoint()
 
 if train:
+
+	# Create corresponding model path based on the implementation
 	log_file="log"
 	model_path="model_state"
 
@@ -112,14 +114,14 @@ if train:
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
 
 	# Initialize final model
-	if use_semantic_embeddings:
+	if use_semantic_embeddings: # Load Glove embedding
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
 				Sy_word.append(line.rstrip("\n"))
 		glove_embeddings=obtain_glove_embeddings(semantic_embeddings_path, Sy_word )
 		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_semantic_embeddings, glove_embeddings=glove_embeddings, finetune_semantic_embeddings= finetune_semantics_embedding, seperate_RNN=seperate_RNN)
-	elif use_FastText_embeddings:
+	elif use_FastText_embeddings: # Load FastText embedding
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
@@ -142,7 +144,7 @@ if train:
 		print("*intents*| train accuracy: %.2f| train loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (train_intent_acc, train_intent_loss, valid_intent_acc, valid_intent_loss) )
 
 		trainer.save_checkpoint(model_path=model_path)
-		if save_best_model:
+		if save_best_model: # Save best model observed till now
 			if (valid_intent_acc>best_valid_acc):
 				best_valid_acc=valid_intent_acc
 				best_valid_loss=valid_intent_loss
@@ -151,12 +153,12 @@ if train:
 	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
-	trainer.load_checkpoint(model_path=best_model_path)
+	trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
 	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 
-if get_words:
+if get_words: # Generate predict utterances by ASR module
 	# Generate datasets
 	Sy_word = []
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
@@ -165,14 +167,14 @@ if get_words:
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split)
 
 	# Initialize final model
-	if use_FastText_embeddings:
+	if use_FastText_embeddings: # Load FastText embeddings
 		FastText_embeddings=obtain_fasttext_embeddings(semantic_embeddings_path, Sy_word)
 		model = Model(config=config,pipeline=False, use_semantic_embeddings = use_FastText_embeddings, glove_embeddings=FastText_embeddings,glove_emb_dim=300)
 
 	else:
 		model = Model(config=config)
 
-	# Train the final model
+	# Train the final model and load pretrained model
 	trainer = Trainer(model=model, config=config)
 	if use_FastText_embeddings and disjoint_split:
 		trainer.load_checkpoint("model_state_disjoint_FastText_finetune_semantic_best.pth")
@@ -181,10 +183,10 @@ if get_words:
 	elif use_FastText_embeddings:
 		trainer.load_checkpoint("model_state_FastText.pth")
 	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words)
-	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words})
+	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words}) # Save predicted utterances
 	df.to_csv(args.save_words_path, index=False)
 
-if pipeline_train:
+if pipeline_train: # Train model in pipeline manner
 	# Generate datasets
 	Sy_word = []
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
@@ -226,7 +228,7 @@ if pipeline_train:
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
 
-if pipeline_gold_train:
+if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split)
 
@@ -267,7 +269,7 @@ if pipeline_gold_train:
 	only_model_path=only_model_path + ".pth"
 	with_model_path=with_model_path + ".pth"
 
-	for epoch in range(config.training_num_epochs):
+	for epoch in range(config.training_num_epochs): # Train intent model on gold set utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset,gold=True,log_file=log_file)
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset, postprocess_words,log_file=log_file)
@@ -277,7 +279,7 @@ if pipeline_gold_train:
 		trainer.save_checkpoint(model_path=only_model_path)
 	
 	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
-	for epoch in range(config.training_num_epochs):
+	for epoch in range(config.training_num_epochs): # Train intent model on predicted utterances
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.pipeline_train_decoder(train_dataset, postprocess_words,log_file=log_file)
 		valid_intent_acc, valid_intent_loss = trainer.pipeline_test_decoder(valid_dataset, postprocess_words, log_file=log_file)

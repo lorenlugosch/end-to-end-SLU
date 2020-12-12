@@ -1,3 +1,4 @@
+# Create error analysis file for model
 import torch
 import numpy as np
 from models import PretrainedModel, Model, obtain_fasttext_embeddings
@@ -31,8 +32,9 @@ torch.manual_seed(config.seed); np.random.seed(config.seed)
 # Generate datasets
 train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, disjoint_split=disjoint_split)
 
-# Initialize final model
+# Initialize model
 if use_FastText_embeddings:
+	# Load FastText Embedding
 	Sy_word = []
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
@@ -42,11 +44,11 @@ if use_FastText_embeddings:
 else:
 	model = Model(config=config)
 
-# Train the final model
+# Load the trained model
 trainer = Trainer(model=model, config=config)
 if restart: trainer.load_checkpoint(model_path)
 
-
+# Create csv file containing errors made by model
 test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path)
 print("========= Test results =========")
 print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )

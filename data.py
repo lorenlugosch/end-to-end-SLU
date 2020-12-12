@@ -136,7 +136,7 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 	"""
 	base_path = config.slu_path
 
-	# Split
+	# Split - Added support for random split and disjoint split
 	if not config.seq2seq:
 		synthetic_train_df = pd.read_csv(os.path.join(base_path, "data", "synthetic_data.csv"))
 		if random_split:
@@ -185,8 +185,8 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		#synthetic_train_df = synthetic_train_df.set_index(np.arange(len(synthetic_train_df)))
 
 	train_df = pd.concat([synthetic_train_df, real_train_df]).reset_index()
-	if not config.seq2seq:
-		if random_split:
+	if not config.seq2seq: # Read valid and test set - Added support for random split and disjoint split
+		if random_split: 
 			valid_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "test_data.csv"))
 		elif disjoint_split:
@@ -209,7 +209,7 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 			for idx,value in enumerate(slot_values):
 				Sy_intent[slot][value] = idx
 			values_per_slot.append(len(slot_values))
-		print(f"Saved slot-name-to-index mapping to intent_mapping.json")
+		print(f"Saved slot-name-to-index mapping to intent_mapping.json") # Saved slot-name-to-index mapping
 		json.dump(Sy_intent, open("intent_mapping.json", 'w'))
 		config.values_per_slot = values_per_slot
 		config.Sy_intent = Sy_intent
@@ -248,7 +248,7 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		print("No phoneme file found.")
 
 	# Create dataset objects
-	if use_gold_utterances:
+	if use_gold_utterances: # Created support for training intent model on gold utterances
 		Sy_word = []
 		with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 			for line in f.readlines():
@@ -348,14 +348,16 @@ class SLUDataset(torch.utils.data.Dataset):
 			y_intent += [self.Sy_intent.index(c) for c in self.df.loc[idx]["semantics"]]
 			y_intent.append(self.Sy_intent.index("<eos>"))
 
-		return (x, self.df.loc[idx].path, y_intent)
+		return (x, self.df.loc[idx].path, y_intent) # Return audio path - useful for error analysis 
 
+# Class to load data used to train intent model on gold set utterances
 class SLU_GoldDataset(torch.utils.data.Dataset):
 	def __init__(self, df, base_path, Sy_word, Sy_intent, config, upsample_factor=1):
 		"""
 		df:
 		Sy_intent: Dictionary (transcript --> slot values)
 		config: Config object (contains info about model and training)
+		Sy_word: List of words in vocabulary
 		"""
 		self.df = df
 		self.base_path = base_path
@@ -457,7 +459,7 @@ class CollateWavsSLU:
 			y_intent = torch.stack(y_intent)
 			y_intent = one_hot(y_intent, self.num_labels)
 
-			return (x,x_paths,y_intent)
+			return (x,x_paths,y_intent) # Added support for returning audio paths
 
 def get_ASR_datasets(config):
 	"""
