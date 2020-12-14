@@ -1022,8 +1022,14 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
 		if self.use_semantic_embeddings:
-			x_words = self.get_words(x)
-			out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1)
+			if self.smooth_semantic:
+				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
+				smooth_word_emb=self.semantic_embeddings(x_words)
+				word_emb=torch.matmul(x_weight, smooth_word_emb).reshape(x_weight.shape[0],x_weight.shape[1],-1) # multiply the embeddings with the prediction probability to get combined embedding
+			else:
+				x_words = self.get_words(x) # get words predicted by ASR
+				word_emb=self.semantic_embeddings(x_words)
+			out = torch.cat((out,word_emb),dim=-1)
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:

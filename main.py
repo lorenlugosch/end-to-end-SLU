@@ -184,15 +184,19 @@ if get_words: # Generate predict utterances by ASR module
 	else:
 		model = Model(config=config)
 
-	# Train the final model and load pretrained model
+	# Load pretrained model
 	trainer = Trainer(model=model, config=config)
-	if use_FastText_embeddings and disjoint_split:
+	if use_FastText_embeddings and smooth_semantic:
+		trainer.load_checkpoint("model_state_disjoint_FastText_smooth_10_finetune_semantic_best.pth")
+	elif use_FastText_embeddings and disjoint_split:
 		trainer.load_checkpoint("model_state_disjoint_FastText_finetune_semantic_best.pth")
 	elif disjoint_split:
 		trainer.load_checkpoint("model_state_disjoint_best.pth")
 	elif use_FastText_embeddings:
 		trainer.load_checkpoint("model_state_FastText.pth")
-	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words)
+
+	# get words from pretrained model
+	predicted_words, audio_paths = trainer.get_word_SLU(test_dataset,Sy_word, postprocess_words, smooth_semantic= smooth_semantic, smooth_semantic_parameter= smooth_semantic_parameter)
 	df=pd.DataFrame({'audio path': audio_paths, 'predicted_words': predicted_words}) # Save predicted utterances
 	df.to_csv(args.save_words_path, index=False)
 

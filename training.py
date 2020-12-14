@@ -119,7 +119,7 @@ class Trainer:
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
-	def get_word_SLU(self, dataset, Sy_word, postprocess_words=False, print_interval=100): # Code to return predicted utterances from the model
+	def get_word_SLU(self, dataset, Sy_word, postprocess_words=False, print_interval=100, smooth_semantic= False, smooth_semantic_parameter= None): # Code to return predicted utterances from the model
 		train_intent_acc = 0
 		train_intent_loss = 0
 		num_examples = 0
@@ -131,7 +131,10 @@ class Trainer:
 			x, x_paths, y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			x_words = self.model.get_words(x)
+			if smooth_semantic:
+				x_words, x_weight = self.model.get_top_words( x, k=smooth_semantic_parameter)
+			else:
+				x_words = self.model.get_words(x)
 			if postprocess_words:
 				x_words_new=[]
 				for j in x_words:
@@ -147,7 +150,10 @@ class Trainer:
 					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
 					x_words_new.append(cur_list)
 				x_words=x_words_new
-			actual_words=[[Sy_word[k] for k in j] for j in x_words]
+			if smooth_semantic:
+				actual_words=[[[Sy_word[topk] for topk in k] for k in j] for j in x_words]
+			else:
+				actual_words=[[Sy_word[k] for k in j] for j in x_words]
 			actual_words_complete=actual_words_complete+actual_words
 			audio_paths.extend(x_paths)
 		return actual_words_complete, audio_paths
