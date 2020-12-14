@@ -145,7 +145,8 @@ class Trainer:
 						prev_k=k
 					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
 					x_words_new.append(cur_list)
-			actual_words=[[Sy_word[k] for k in j] for j in x_words_new]
+				x_words = x_words_new
+			actual_words=[[Sy_word[k] for k in j] for j in x_words]
 			actual_words_complete=actual_words_complete+actual_words
 			audio_paths.extend(x_paths)
 		return actual_words_complete, audio_paths
