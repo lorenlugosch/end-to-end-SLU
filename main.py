@@ -162,10 +162,11 @@ if train:
 	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
 	print("========= Test results =========")
 	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, valid_intent_acc, valid_intent_loss) )
-	trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
-	test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
-	print("========= Test results =========")
-	print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
+	if save_best_model:
+		trainer.load_checkpoint(model_path=best_model_path) # Compute performance of best model on test set
+		test_intent_acc, test_intent_loss = trainer.test(test_dataset,log_file=log_file)
+		print("========= Test results =========")
+		print("*intents*| test accuracy: %.2f| test loss: %.2f| valid accuracy: %.2f| valid loss: %.2f\n" % (test_intent_acc, test_intent_loss, best_valid_acc, best_valid_loss) )
 
 if get_words: # Generate predict utterances by ASR module
 	# Generate datasets
