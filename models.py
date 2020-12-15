@@ -653,11 +653,7 @@ class Seq2SeqDecoder(torch.nn.Module):
 
 		return beam_scores, beam
 
-def obtain_glove_embeddings(filename, vocab,dim=100):
-	
-	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
-	
-	# vocab = [k for k,v in word_to_ix.items()]
+def obtain_glove_embeddings(filename, vocab,dim=100): # Load glove embeddings
 	
 	word_vecs={}
 	with open(filename, 'rb') as f:
@@ -683,11 +679,7 @@ def obtain_glove_embeddings(filename, vocab,dim=100):
 	word_embeddings = np.array(word_embeddings)
 	return word_embeddings
 
-def obtain_fasttext_embeddings(filename, vocab,dim=300):
-	
-	# vecs = pickle.load(open(filename,'rb'),encoding='latin1')
-	
-	# vocab = [k for k,v in word_to_ix.items()]
+def obtain_fasttext_embeddings(filename, vocab,dim=300): # Load FastText embeddings
 	
 	fin = io.open(filename, 'r', encoding='utf-8', newline='\n', errors='ignore')
 	n, d = map(int, fin.readline().split())
@@ -715,7 +707,7 @@ class Model(torch.nn.Module):
 	"""
 	End-to-end SLU model.
 	"""
-	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100):
+	def __init__(self, config, pipeline=False,finetune=False,use_semantic_embeddings = False, glove_embeddings=None,glove_emb_dim=100, finetune_semantic_embeddings = False, seperate_RNN=False, smooth_semantic= False, smooth_semantic_parameter= 1):
 		super(Model, self).__init__()
 		self.is_cuda = torch.cuda.is_available()
 		self.Sy_intent = config.Sy_intent
@@ -736,21 +728,53 @@ class Model(torch.nn.Module):
 		out_dim = config.word_rnn_num_hidden[-1]
 		if config.word_rnn_bidirectional:
 			out_dim *= 2 
-		if pipeline:
+		if pipeline: # Initialise word embedding for intent model with the weights of pretrained word classifier
 			self.embedding=torch.nn.Embedding(config.vocabulary_size+1,pretrained_model.word_linear.weight.data.shape[1])
 			self.embedding.weight.data[:config.vocabulary_size]=pretrained_model.word_linear.weight.data.clone()
 			self.embedding.weight.requires_grad = finetune
 		self.use_semantic_embeddings = use_semantic_embeddings
-		if use_semantic_embeddings:
+		self.seperate_RNN=seperate_RNN
+		if use_semantic_embeddings: # Load pretrained semantic embedding to be used along with speech embeddings
 			self.semantic_embeddings= torch.nn.Embedding(config.vocabulary_size+1,glove_emb_dim)
 			self.semantic_embeddings.weight.data.copy_(torch.from_numpy(glove_embeddings))
-			out_dim=out_dim+glove_emb_dim
-			self.semantic_embeddings.weight.requires_grad = False
+			if self.seperate_RNN==False: 
+				out_dim=out_dim+glove_emb_dim
+			self.semantic_embeddings.weight.requires_grad = finetune_semantic_embeddings
+			self.smooth_semantic=smooth_semantic
+			self.smooth_semantic_parameter=smooth_semantic_parameter
 		# fixed-length output:
 		if not self.seq2seq:
 			self.values_per_slot = config.values_per_slot
 			self.num_values_total = sum(self.values_per_slot)
 			num_rnn_layers = len(config.intent_rnn_num_hidden)
+			if self.seperate_RNN: # Create seperate RNN layers for semantic embedding
+				self.semantic_layers=[]
+				out_dim_semantic=glove_emb_dim
+				for idx in range(num_rnn_layers):
+					# recurrent
+					layer = torch.nn.GRU(input_size=out_dim_semantic, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
+					layer.name = "intent_rnn%d" % idx
+					self.semantic_layers.append(layer)
+			
+					out_dim_semantic = config.intent_rnn_num_hidden[idx]
+					if config.intent_rnn_bidirectional:
+						out_dim_semantic *= 2
+
+					# grab hidden states of RNN for each timestep
+					layer = RNNSelect()
+					layer.name = "intent_rnn_select%d" % idx
+					self.semantic_layers.append(layer)
+
+					# dropout
+					layer = torch.nn.Dropout(p=config.intent_rnn_drop[idx])
+					layer.name = "intent_dropout%d" % idx
+					self.semantic_layers.append(layer)
+
+					# downsample
+					layer = Downsample(method=config.intent_downsample_type[idx], factor=config.intent_downsample_len[idx], axis=1)
+					layer.name = "intent_downsample%d" % idx
+					self.semantic_layers.append(layer)
+				self.semantic_layers = torch.nn.ModuleList(self.semantic_layers)
 			for idx in range(num_rnn_layers):
 				# recurrent
 				layer = torch.nn.GRU(input_size=out_dim, hidden_size=config.intent_rnn_num_hidden[idx], batch_first=True, bidirectional=config.intent_rnn_bidirectional)
@@ -776,13 +800,24 @@ class Model(torch.nn.Module):
 				layer.name = "intent_downsample%d" % idx
 				self.intent_layers.append(layer)
 
-			layer = torch.nn.Linear(out_dim, self.num_values_total)
-			layer.name = "final_classifier"
-			self.intent_layers.append(layer)
+			if self.seperate_RNN:
+				self.final_layers=[]
+				layer = torch.nn.Linear(out_dim + out_dim_semantic, self.num_values_total)
+				layer.name = "final_classifier"
+				self.final_layers.append(layer)
 
-			layer = FinalPool()
-			layer.name = "final_pool"
-			self.intent_layers.append(layer)
+				layer = FinalPool()
+				layer.name = "final_pool"
+				self.final_layers.append(layer)
+				self.final_layers = torch.nn.ModuleList(self.final_layers)
+			else:
+				layer = torch.nn.Linear(out_dim, self.num_values_total)
+				layer.name = "final_classifier"
+				self.intent_layers.append(layer)
+
+				layer = FinalPool()
+				layer.name = "final_pool"
+				self.intent_layers.append(layer)
 
 			self.intent_layers = torch.nn.ModuleList(self.intent_layers)
 
@@ -873,12 +908,30 @@ class Model(torch.nn.Module):
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
 		if self.use_semantic_embeddings:
-			x_words = self.get_words(x)
-			out = torch.cat((out,self.semantic_embeddings(x_words)),dim=-1)
+			if self.smooth_semantic:
+				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
+				smooth_word_emb=self.semantic_embeddings(x_words)
+				word_emb=torch.matmul(x_weight, smooth_word_emb).reshape(x_weight.shape[0],x_weight.shape[1],-1) # multiply the embeddings with the prediction probability to get combined embedding
+			else:
+				x_words = self.get_words(x) # get words predicted by ASR
+				word_emb=self.semantic_embeddings(x_words)
+			if self.seperate_RNN==False:
+				out = torch.cat((out,word_emb),dim=-1) # Simply concatenate speech embedding with pretrained semantic embedding and pass through common RNN layer
+			else:
+				semantic_out=word_emb # get semantic embeddings 
 
 		if not self.seq2seq:
-			for layer in self.intent_layers:
-				out = layer(out)
+			if self.seperate_RNN==False: # Common RNN for semantic and speech embeddings
+				for layer in self.intent_layers:
+					out = layer(out)
+			else: # seperate RNN for semantic and speech embeddings
+				for layer in self.intent_layers:
+					out = layer(out)
+				for layer in self.semantic_layers:
+					semantic_out = layer(semantic_out)
+				out = torch.cat((out,semantic_out),dim=-1)
+				for layer in self.final_layers:
+					out = layer(out)
 			intent_logits = out # shape: (batch size, num_values_total)
 
 			intent_loss = 0.
@@ -900,9 +953,9 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def run_pipeline(self, x, y_intent):
+	def run_pipeline(self, x, y_intent): # code to run pipeline model
 		"""
-		x : Tensor of shape (batch size, T)
+		x : LongTensor of shape (batch size, T) - utterance over which intent module is trained
 		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		if self.is_cuda:
@@ -936,10 +989,9 @@ class Model(torch.nn.Module):
 			log_probs = self.decoder(out, y_intent)
 			return -log_probs.mean(), torch.tensor([0.])
 
-	def get_words(self, x):
+	def get_words(self, x):  # code to get predicted utterances from ASR model
 		"""
 		x : Tensor of shape (batch size, T)
-		y_intent : LongTensor of shape (batch size, num_slots)
 		"""
 		_, x_words= self.pretrained_model.compute_posteriors(x)
 		x_words_old_shape=x_words.shape
@@ -948,7 +1000,20 @@ class Model(torch.nn.Module):
 		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1])
 		return final_words
 
-	def test(self, x, y_intent):
+	def get_top_words(self, x, k=5):  # code to return topk words at each point in predicted sequence along with their normalised prediction probabilities 
+		"""
+		x : Tensor of shape (batch size, T)
+		"""
+		_, x_words= self.pretrained_model.compute_posteriors(x)
+		x_words_old_shape=x_words.shape
+		x_words = x_words.view(x_words.shape[0]*x_words.shape[1], -1)
+		final_words_weight, final_words=x_words.topk(k,dim=1)
+		final_words_normalised_weight= torch.transpose(torch.transpose(final_words_weight,0,1)/final_words_weight.sum(1),0,1) # normalise  prob such that probabilities for top k sum to 1
+		final_words=final_words.reshape(x_words_old_shape[0],x_words_old_shape[1],k)
+		final_words_normalised_weight=final_words_normalised_weight.reshape(x_words_old_shape[0],x_words_old_shape[1], 1, k)
+		return final_words, final_words_normalised_weight
+
+	def test(self, x, y_intent): # code to return error cases for trained model
 		"""
 		x : Tensor of shape (batch size, T)
 		y_intent : LongTensor of shape (batch size, num_slots)
@@ -956,6 +1021,15 @@ class Model(torch.nn.Module):
 		if self.is_cuda:
 			y_intent = y_intent.cuda()
 		out = self.pretrained_model.compute_features(x)
+		if self.use_semantic_embeddings:
+			if self.smooth_semantic:
+				x_words, x_weight = self.get_top_words( x, k=self.smooth_semantic_parameter)
+				smooth_word_emb=self.semantic_embeddings(x_words)
+				word_emb=torch.matmul(x_weight, smooth_word_emb).reshape(x_weight.shape[0],x_weight.shape[1],-1) # multiply the embeddings with the prediction probability to get combined embedding
+			else:
+				x_words = self.get_words(x) # get words predicted by ASR
+				word_emb=self.semantic_embeddings(x_words)
+			out = torch.cat((out,word_emb),dim=-1)
 
 		if not self.seq2seq:
 			for layer in self.intent_layers:
@@ -974,7 +1048,7 @@ class Model(torch.nn.Module):
 			predicted_intent = torch.stack(predicted_intent, dim=1)
 			intent_acc = (predicted_intent == y_intent).prod(1).float().mean() # all slots must be correct
 
-			return predicted_intent,y_intent,intent_loss, intent_acc
+			return predicted_intent,y_intent,intent_loss, intent_acc # return both predicted as well as gold intent
 
 		else: # seq2seq
 			out = self.encoder(out)

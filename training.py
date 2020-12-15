@@ -21,6 +21,7 @@ class Trainer:
 		self.df = None
 
 	def load_checkpoint(self,model_path="model_state.pth"):
+		print(os.path.join(self.checkpoint_path, model_path))
 		if os.path.isfile(os.path.join(self.checkpoint_path, model_path)):
 			try:
 				if self.model.is_cuda:
@@ -118,7 +119,7 @@ class Trainer:
 			self.epoch += 1
 			return train_intent_acc, train_intent_loss
 
-	def get_word_SLU(self, dataset, Sy_word, postprocess_words=False, print_interval=100):
+	def get_word_SLU(self, dataset, Sy_word, postprocess_words=False, print_interval=100, smooth_semantic= False, smooth_semantic_parameter= None): # Code to return predicted utterances from the model
 		train_intent_acc = 0
 		train_intent_loss = 0
 		num_examples = 0
@@ -130,7 +131,10 @@ class Trainer:
 			x, x_paths, y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			x_words = self.model.get_words(x)
+			if smooth_semantic:
+				x_words, x_weight = self.model.get_top_words( x, k=smooth_semantic_parameter)
+			else:
+				x_words = self.model.get_words(x)
 			if postprocess_words:
 				x_words_new=[]
 				for j in x_words:
@@ -145,13 +149,16 @@ class Trainer:
 						prev_k=k
 					cur_list=cur_list+([0]*(len(j)-len(cur_list)))
 					x_words_new.append(cur_list)
-				x_words = x_words_new
-			actual_words=[[Sy_word[k] for k in j] for j in x_words]
+				x_words=x_words_new
+			if smooth_semantic:
+				actual_words=[[[Sy_word[topk] for topk in k] for k in j] for j in x_words]
+			else:
+				actual_words=[[Sy_word[k] for k in j] for j in x_words]
 			actual_words_complete=actual_words_complete+actual_words
 			audio_paths.extend(x_paths)
 		return actual_words_complete, audio_paths
 
-	def pipeline_train_decoder(self, dataset, postprocess_words=False, print_interval=100,gold=False, log_file="log.csv"):
+	def pipeline_train_decoder(self, dataset, postprocess_words=False, print_interval=100,gold=False, log_file="log.csv"): # Code to train model in pipeline manner
 		train_intent_acc = 0
 		train_intent_loss = 0
 		num_examples = 0
@@ -161,12 +168,12 @@ class Trainer:
 			x,_,y_intent = batch
 			batch_size = len(x)
 			num_examples += batch_size
-			if gold:
+			if gold: # Use gold set utterances
 				x_words=x.type(torch.LongTensor)
 				if torch.cuda.is_available():
 					x_words = x_words.cuda()
 			else:
-				x_words = self.model.get_words(x)
+				x_words = self.model.get_words(x) # Use utterances predicted by ASR
 				if postprocess_words:
 					x_words_new=[]
 					for j in x_words:
@@ -263,7 +270,7 @@ class Trainer:
 			self.log(results, log_file)
 			return test_intent_acc, test_intent_loss 
 	
-	def pipeline_test_decoder(self, dataset, postprocess_words=False, log_file="log.csv"):
+	def pipeline_test_decoder(self, dataset, postprocess_words=False, log_file="log.csv"): #Code to test model in pipeline manner
 		test_intent_acc = 0
 		test_intent_loss = 0
 		num_examples = 0
@@ -307,7 +314,7 @@ class Trainer:
 		self.log(results, log_file)
 		return test_intent_acc, test_intent_loss
 
-	def get_error(self, dataset, error_path=None):
+	def get_error(self, dataset, error_path=None): # Code to generate csv file containing error cases for model
 		if isinstance(dataset, ASRDataset):
 			test_phone_acc = 0
 			test_phone_loss = 0
