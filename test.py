@@ -51,9 +51,6 @@ else:
 # Load the trained model
 trainer = Trainer(model=model, config=config)
 if restart: trainer.load_checkpoint(model_path)
-test_intent_acc, test_intent_loss = trainer.test(test_dataset)
-print("========= Test results =========")
-print("*intents*| test accuracy: %.2f| test loss: %.2f\n" % (test_intent_acc, test_intent_loss) )
 # Create csv file containing errors made by model
 test_intent_acc, test_intent_loss = trainer.get_error(test_dataset, error_path=args.error_path)
 print("========= Test results =========")

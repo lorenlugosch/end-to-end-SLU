@@ -143,8 +143,7 @@ if train:
 	# Train the final model
 	trainer = Trainer(model=model, config=config)
 	if restart: trainer.load_checkpoint()
-	# config.training_num_epochs=30 # increased the number of epochs that I run, did not really helped that much since I got best valid accuracy at 11 epoch for topk=10 so I have commented it
-	
+		
 	for epoch in range(config.training_num_epochs):
 		print("========= Epoch %d of %d =========" % (epoch+1, config.training_num_epochs))
 		train_intent_acc, train_intent_loss = trainer.train(train_dataset,log_file=log_file)
