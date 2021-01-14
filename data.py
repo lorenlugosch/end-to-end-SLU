@@ -14,8 +14,9 @@ from subprocess import call
 from string import punctuation
 
 class Config:
-	def __init__(self):
+	def __init__(self, slots = ["action", "object", "location"]):
 		self.use_sincnet = True
+		self.slots = slots
 
 def read_config(config_file):
 	config = Config()
@@ -201,10 +202,15 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 
 	if not config.seq2seq:
 		# Get list of slots
-		Sy_intent = {"action": {}, "object": {}, "location": {}}
+		Sy_intent = {}
+		for intent_type in config.slots:
+			Sy_intent[intent_type] = {}
+		# Before:
+		# Sy_intent = {"action": {}, "object": {}, "location": {}}
+		# TODO(Vijay): Delete ^this commented section
 
 		values_per_slot = []
-		for slot in ["action", "object", "location"]:
+		for slot in config.slots:
 			slot_values = Counter(train_df[slot])
 			for idx,value in enumerate(slot_values):
 				Sy_intent[slot][value] = idx
@@ -279,6 +285,7 @@ class SLUDataset(torch.utils.data.Dataset):
 		self.augment = False #augment
 		self.SNRs = [0,5,10,15,20]
 		self.seq2seq = config.seq2seq
+		self.config = config
 
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
 
@@ -339,7 +346,7 @@ class SLUDataset(torch.utils.data.Dataset):
 
 		if not self.seq2seq:
 			y_intent = [] 
-			for slot in ["action", "object", "location"]:
+			for slot in self.config.slots:
 				value = self.df.loc[idx][slot]
 				y_intent.append(self.Sy_intent[slot][value])
 		else:
@@ -370,6 +377,7 @@ class SLU_GoldDataset(torch.utils.data.Dataset):
 		self.seq2seq = config.seq2seq
 		self.config_vocab_size = config.vocabulary_size
 		self.loader = torch.utils.data.DataLoader(self, batch_size=config.training_batch_size, num_workers=multiprocessing.cpu_count(), shuffle=True, collate_fn=CollateWavsSLU(self.Sy_intent, self.seq2seq))
+		self.config = config
 
 	def __len__(self):
 		#if self.augment: return len(self.df)*2 # second half of dataset is augmented
@@ -388,7 +396,7 @@ class SLU_GoldDataset(torch.utils.data.Dataset):
 
 		if not self.seq2seq:
 			y_intent = [] 
-			for slot in ["action", "object", "location"]:
+			for slot in self.config.slots:
 				value = self.df.loc[idx][slot]
 				y_intent.append(self.Sy_intent[slot][value])
 		else:
