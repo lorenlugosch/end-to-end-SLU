@@ -13,10 +13,11 @@ import pandas as pd
 from subprocess import call
 from string import punctuation
 
+DEFAULT_SLOTS = ["action", "object", "location"]
+
 class Config:
-	def __init__(self, slots = ["action", "object", "location"]):
+	def __init__(self):
 		self.use_sincnet = True
-		self.slots = slots
 
 def read_config(config_file):
 	config = Config()
@@ -26,7 +27,12 @@ def read_config(config_file):
 	#[experiment]
 	config.seed=int(parser.get("experiment", "seed"))
 	config.folder=parser.get("experiment", "folder")
-	
+
+	if "experiment" in parser and "slots" in parser["experiment"]:
+		config.slots=[x.strip() for x in parser["experiment"]["slots"].split(",")]
+	else:
+		config.slots=DEFAULT_SLOTS
+
 	# Make a folder containing experiment information
 	if not os.path.isdir(config.folder):
 		os.mkdir(config.folder)
@@ -131,7 +137,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True):
 	"""
 	config: Config object (contains info about model and training)
 	"""
@@ -144,6 +150,8 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/random_splits", "train_data.csv"))
 		elif disjoint_split:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "train_data.csv"))
+		elif single_label:
+			real_train_df = pd.read_csv(os.path.join(base_path, "data/single_label", "train_data.csv"))
 		else:
 			real_train_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "train_data.csv"))
 		if "\"Unnamed: 0\"" in list(real_train_df): real_train_df = real_train_df.drop(columns="Unnamed: 0")
@@ -193,6 +201,9 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		elif disjoint_split:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/zeroshot_splits", "test_data.csv"))
+		elif single_label:
+			valid_df = pd.read_csv(os.path.join(base_path, "data/single_label", "valid_data.csv"))
+			test_df = pd.read_csv(os.path.join(base_path, "data/single_label", "test_data.csv"))
 		else:
 			valid_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "valid_data.csv"))
 			test_df = pd.read_csv(os.path.join(base_path, "data/original_splits", "test_data.csv"))
@@ -205,9 +216,6 @@ def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoi
 		Sy_intent = {}
 		for intent_type in config.slots:
 			Sy_intent[intent_type] = {}
-		# Before:
-		# Sy_intent = {"action": {}, "object": {}, "location": {}}
-		# TODO(Vijay): Delete ^this commented section
 
 		values_per_slot = []
 		for slot in config.slots:

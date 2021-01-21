@@ -29,6 +29,8 @@ parser.add_argument('--seperate_RNN', action='store_true', help='run seperate RN
 parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
+parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple)')
+
 
 args = parser.parse_args()
 pretrain = args.pretrain
@@ -50,6 +52,8 @@ save_best_model = args.save_best_model
 seperate_RNN = args.seperate_RNN
 smooth_semantic = args.smooth_semantic
 smooth_semantic_parameter = int(args.smooth_semantic_parameter)
+
+single_label = args.single_label
 
 # Read config file
 config = read_config(config_path)
@@ -120,7 +124,7 @@ if train:
 	model_path=model_path + ".pth"
 
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label)
 
 	# Initialize final model
 	if use_semantic_embeddings: # Load Glove embedding
@@ -174,7 +178,7 @@ if get_words: # Generate predict utterances by ASR module
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,disjoint_split=disjoint_split, single_label=single_label)
 
 	# Initialize final model
 	if use_FastText_embeddings: # Load FastText embeddings
@@ -206,7 +210,7 @@ if pipeline_train: # Train model in pipeline manner
 	with open(os.path.join(config.folder, "pretraining", "words.txt"), "r") as f:
 		for line in f.readlines():
 			Sy_word.append(line.rstrip("\n"))
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config, single_label=single_label)
 
 	if postprocess_words:
 		log_file="log_pipeline_postprocess.csv"
@@ -244,7 +248,7 @@ if pipeline_train: # Train model in pipeline manner
 
 if pipeline_gold_train: # Train model in pipeline manner by using gold set utterances
 	# Generate datasets
-	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split)
+	train_dataset, valid_dataset, test_dataset = get_SLU_datasets(config,use_gold_utterances=True,random_split=random_split, disjoint_split=disjoint_split, single_label=single_label)
 
 	# Initialize final model
 	if use_semantic_embeddings:
