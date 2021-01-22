@@ -29,7 +29,7 @@ parser.add_argument('--seperate_RNN', action='store_true', help='run seperate RN
 parser.add_argument('--save_best_model', action='store_true', help='save the model with best performance on validation set')
 parser.add_argument('--smooth_semantic', action='store_true', help='sum semantic embedding of top k words')
 parser.add_argument('--smooth_semantic_parameter', type=str, default="5",help='value of k in smooth_smantic')
-parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple)')
+parser.add_argument('--single_label', action='store_true',help='Whether our dataset contains a single intent label (or a full triple). Only applied for the FSC dataset.')
 
 
 args = parser.parse_args()
