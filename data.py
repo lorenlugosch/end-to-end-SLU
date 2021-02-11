@@ -137,7 +137,7 @@ def read_config(config_file):
 
 	return config
 
-def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=True):
+def get_SLU_datasets(config,use_gold_utterances=False,random_split=False, disjoint_split=False, single_label=False):
 	"""
 	config: Config object (contains info about model and training)
 	"""
