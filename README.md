@@ -1,7 +1,9 @@
 # End-to-End Spoken Language Understanding (SLU) in PyTorch
-This repo contains Pytorch code for training end-to-end SLU models used in the papers "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)" and "[Using Speech Synthesis to Train End-to-End Spoken Language Understanding Models](https://arxiv.org/abs/1910.09463)".
+This repo contains PyTorch code for training end-to-end SLU models used in the papers "[Speech Model Pre-training for End-to-End Spoken Language Understanding](https://arxiv.org/abs/1904.03670)" and "[Using Speech Synthesis to Train End-to-End Spoken Language Understanding Models](https://arxiv.org/abs/1910.09463)".
 
 If you have any questions about this code or have problems getting it to work, please send me an email at ```<the email address listed for Loren in the paper>```.
+
+(**Note:** See the SpeechBrain repository for [a simpler recipe for Fluent Speech Commands](https://github.com/speechbrain/speechbrain/tree/develop/recipes/fluent-speech-commands) and other SLU benchmarks.)
 
 ## Dependencies
 PyTorch, torchaudio, numpy, soundfile, pandas, tqdm, textgrid.py
